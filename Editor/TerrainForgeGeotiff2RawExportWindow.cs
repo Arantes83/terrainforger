@@ -15,7 +15,7 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
     private string demGridPreviewSourcePath = string.Empty;
     private string demGridPreviewStatus = "No DEM preview loaded.";
 
-    [MenuItem("Tools/TerrainForger/Geotiff2Raw Export")]
+    [MenuItem("TerrainForger/Geotiff2Raw Export")]
     public static void Open()
     {
         var window = GetWindow<TerrainForgeGeotiff2RawExportWindow>("Geotiff2Raw Export");

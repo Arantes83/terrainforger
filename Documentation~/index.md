@@ -21,9 +21,9 @@ TerrainForger is a Unity Editor package focused on terrain workflows driven by G
 
 ## Unity Menus
 
-- `Tools/TerrainForger/Get GIS Data`
-- `Tools/TerrainForger/Geotiff2Raw Export`
-- `Tools/TerrainForger/Import Tiles`
+- `TerrainForger/Get GIS Data`
+- `TerrainForger/Geotiff2Raw Export`
+- `TerrainForger/Import Tiles`
 
 ## Output Paths
 

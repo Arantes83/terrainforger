@@ -16,7 +16,7 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
     private string satellitePreviewStatus = "No satellite preview loaded.";
     private bool showBounds = true;
 
-    [MenuItem("Tools/TerrainForger/Get GIS Data")]
+    [MenuItem("TerrainForger/Get GIS Data")]
     public static void Open()
     {
         var window = GetWindow<TerrainForgeDownloadGeoDataWindow>("Get GIS Data");

@@ -53,9 +53,9 @@ Se estiver desenvolvendo localmente, use `Add package from disk...` e selecione 
 
 ## Menus criados no Unity
 
-- `Tools/TerrainForger/Get GIS Data`
-- `Tools/TerrainForger/Geotiff2Raw Export`
-- `Tools/TerrainForger/Import Tiles`
+- `TerrainForger/Get GIS Data`
+- `TerrainForger/Geotiff2Raw Export`
+- `TerrainForger/Import Tiles`
 
 ## Observacoes
 

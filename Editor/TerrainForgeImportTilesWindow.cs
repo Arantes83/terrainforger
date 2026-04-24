@@ -8,7 +8,7 @@ public class TerrainForgeImportTilesWindow : EditorWindow
 
     private Vector2 scrollPosition;
 
-    [MenuItem("Tools/TerrainForger/Import Tiles")]
+    [MenuItem("TerrainForger/Import Tiles")]
     public static void Open()
     {
         var window = GetWindow<TerrainForgeImportTilesWindow>("Import Tiles");
