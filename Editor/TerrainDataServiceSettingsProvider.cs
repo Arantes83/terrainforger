@@ -1,0 +1,415 @@
+using UnityEditor;
+using UnityEngine;
+using System.IO;
+
+public static class TerrainDataServiceSettingsProvider
+{
+    private const string SettingsPath = "Project/TerrainForger Data Services";
+    private static bool showSecrets;
+    private static bool showQgis = true;
+    private static bool showOpenTopography = true;
+    private static bool showOpenAerialMap;
+    private static bool showCopernicus;
+    private static bool showMapbox;
+    private static bool showGoogleMaps;
+
+    [SettingsProvider]
+    public static SettingsProvider CreateSettingsProvider()
+    {
+        var provider = new SettingsProvider(SettingsPath, SettingsScope.Project)
+        {
+            label = "TerrainForger Data Services",
+            guiHandler = DrawGui,
+            keywords = new System.Collections.Generic.HashSet<string>
+            {
+                "terrain",
+                "opentopography",
+                "openaerialmap",
+                "copernicus",
+                "mapbox",
+                "google",
+                "api",
+                "key",
+                "gis",
+                "dem",
+                "imagery"
+            }
+        };
+
+        return provider;
+    }
+
+    public static void OpenSettings()
+    {
+        SettingsService.OpenProjectSettings(SettingsPath);
+    }
+
+    private static void DrawGui(string searchContext)
+    {
+        var settings = TerrainDataServiceSettings.instance;
+
+        EditorGUILayout.LabelField("TerrainForger Data Services", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Credentials are stored locally in UserSettings for this project. This panel includes open/free data providers and optional commercial imagery providers.",
+            MessageType.Info);
+
+        DrawQgisSection(settings);
+        DrawOpenTopographySection(settings);
+        DrawOpenAerialMapSection();
+        DrawCopernicusSection(settings);
+        DrawMapboxSection(settings);
+        DrawGoogleMapsSection(settings);
+
+        EditorGUILayout.Space();
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button(showSecrets ? "Hide Secrets" : "Show Secrets", GUILayout.Width(120f)))
+            {
+                showSecrets = !showSecrets;
+            }
+
+            GUILayout.FlexibleSpace();
+
+            if (GUILayout.Button("Save Settings", GUILayout.Width(120f)))
+            {
+                settings.SaveSettings();
+                GUIUtility.ExitGUI();
+            }
+        }
+    }
+
+    private static void DrawOpenTopographySection(TerrainDataServiceSettings settings)
+    {
+        EditorGUILayout.Space();
+        showOpenTopography = EditorGUILayout.Foldout(showOpenTopography, "OpenTopography", true);
+        if (!showOpenTopography)
+        {
+            return;
+        }
+
+        DrawProviderSummary(TerrainDataProviderIds.OpenTopography);
+
+        EditorGUI.BeginChangeCheck();
+        var apiKey = showSecrets
+            ? EditorGUILayout.TextField(new GUIContent("API Key"), settings.OpenTopographyApiKey)
+            : EditorGUILayout.PasswordField(new GUIContent("API Key"), settings.OpenTopographyApiKey);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(settings, "Edit OpenTopography API Key");
+            settings.OpenTopographyApiKey = apiKey;
+            EditorUtility.SetDirty(settings);
+        }
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("Paste", GUILayout.Width(80f)))
+            {
+                Undo.RecordObject(settings, "Paste OpenTopography API Key");
+                settings.OpenTopographyApiKey = EditorGUIUtility.systemCopyBuffer ?? string.Empty;
+                EditorUtility.SetDirty(settings);
+                GUIUtility.ExitGUI();
+            }
+
+            if (GUILayout.Button("Clear", GUILayout.Width(80f)))
+            {
+                Undo.RecordObject(settings, "Clear OpenTopography API Key");
+                settings.OpenTopographyApiKey = string.Empty;
+                EditorUtility.SetDirty(settings);
+                GUIUtility.ExitGUI();
+            }
+
+            GUILayout.FlexibleSpace();
+
+            if (GUILayout.Button("Open Docs", GUILayout.Width(120f)))
+            {
+                OpenProviderDocs(TerrainDataProviderIds.OpenTopography);
+            }
+        }
+    }
+
+    private static void DrawQgisSection(TerrainDataServiceSettings settings)
+    {
+        EditorGUILayout.Space();
+        showQgis = EditorGUILayout.Foldout(showQgis, "QGIS", true);
+        if (!showQgis)
+        {
+            return;
+        }
+
+        EditorGUILayout.HelpBox(
+            "Set the root folder of your QGIS installation here. TerrainForger uses this global path to find GDAL tools like gdalinfo and gdalwarp.",
+            MessageType.None);
+
+        EditorGUI.BeginChangeCheck();
+        var installFolder = EditorGUILayout.TextField(new GUIContent("Install Folder"), settings.QgisInstallFolder);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(settings, "Edit QGIS Install Folder");
+            settings.QgisInstallFolder = installFolder;
+            EditorUtility.SetDirty(settings);
+        }
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("Browse QGIS Folder", GUILayout.Width(140f)))
+            {
+                var startFolder = string.IsNullOrWhiteSpace(settings.QgisInstallFolder)
+                    ? "C:\\Program Files"
+                    : settings.QgisInstallFolder;
+                var selected = EditorUtility.OpenFolderPanel("Select QGIS Installation Folder", startFolder, string.Empty);
+                if (!string.IsNullOrEmpty(selected))
+                {
+                    Undo.RecordObject(settings, "Browse QGIS Install Folder");
+                    settings.QgisInstallFolder = selected;
+                    EditorUtility.SetDirty(settings);
+                    GUIUtility.ExitGUI();
+                }
+            }
+
+            if (GUILayout.Button("Reveal", GUILayout.Width(80f)))
+            {
+                var folder = settings.QgisInstallFolder;
+                if (!string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder))
+                {
+                    EditorUtility.RevealInFinder(folder);
+                }
+            }
+
+            if (GUILayout.Button("Clear", GUILayout.Width(80f)))
+            {
+                Undo.RecordObject(settings, "Clear QGIS Install Folder");
+                settings.QgisInstallFolder = string.Empty;
+                EditorUtility.SetDirty(settings);
+                GUIUtility.ExitGUI();
+            }
+        }
+    }
+
+    private static void DrawOpenAerialMapSection()
+    {
+        EditorGUILayout.Space();
+        showOpenAerialMap = EditorGUILayout.Foldout(showOpenAerialMap, "OpenAerialMap", true);
+        if (!showOpenAerialMap)
+        {
+            return;
+        }
+
+        DrawProviderSummary(TerrainDataProviderIds.OpenAerialMap);
+        EditorGUILayout.HelpBox(
+            "No API key is required for the public metadata API. Imagery availability and licensing vary by source item.",
+            MessageType.None);
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Open Docs", GUILayout.Width(120f)))
+            {
+                OpenProviderDocs(TerrainDataProviderIds.OpenAerialMap);
+            }
+        }
+    }
+
+    private static void DrawCopernicusSection(TerrainDataServiceSettings settings)
+    {
+        EditorGUILayout.Space();
+        showCopernicus = EditorGUILayout.Foldout(showCopernicus, "Copernicus Data Space", true);
+        if (!showCopernicus)
+        {
+            return;
+        }
+
+        DrawProviderSummary(TerrainDataProviderIds.CopernicusDataSpace);
+
+        EditorGUI.BeginChangeCheck();
+        var clientId = EditorGUILayout.TextField(new GUIContent("Client ID"), settings.CopernicusClientId);
+        var clientSecret = showSecrets
+            ? EditorGUILayout.TextField(new GUIContent("Client Secret"), settings.CopernicusClientSecret)
+            : EditorGUILayout.PasswordField(new GUIContent("Client Secret"), settings.CopernicusClientSecret);
+        var instanceId = EditorGUILayout.TextField(new GUIContent("Instance ID"), settings.CopernicusInstanceId);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(settings, "Edit Copernicus Credentials");
+            settings.CopernicusClientId = clientId;
+            settings.CopernicusClientSecret = clientSecret;
+            settings.CopernicusInstanceId = instanceId;
+            EditorUtility.SetDirty(settings);
+        }
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("Paste Client ID", GUILayout.Width(120f)))
+            {
+                Undo.RecordObject(settings, "Paste Copernicus Client ID");
+                settings.CopernicusClientId = EditorGUIUtility.systemCopyBuffer ?? string.Empty;
+                EditorUtility.SetDirty(settings);
+                GUIUtility.ExitGUI();
+            }
+
+            if (GUILayout.Button("Paste Secret", GUILayout.Width(100f)))
+            {
+                Undo.RecordObject(settings, "Paste Copernicus Secret");
+                settings.CopernicusClientSecret = EditorGUIUtility.systemCopyBuffer ?? string.Empty;
+                EditorUtility.SetDirty(settings);
+                GUIUtility.ExitGUI();
+            }
+
+            if (GUILayout.Button("Clear", GUILayout.Width(80f)))
+            {
+                Undo.RecordObject(settings, "Clear Copernicus Credentials");
+                settings.CopernicusClientId = string.Empty;
+                settings.CopernicusClientSecret = string.Empty;
+                settings.CopernicusInstanceId = string.Empty;
+                EditorUtility.SetDirty(settings);
+                GUIUtility.ExitGUI();
+            }
+
+            GUILayout.FlexibleSpace();
+
+            if (GUILayout.Button("Open Docs", GUILayout.Width(120f)))
+            {
+                OpenProviderDocs(TerrainDataProviderIds.CopernicusDataSpace);
+            }
+        }
+    }
+
+    private static void DrawMapboxSection(TerrainDataServiceSettings settings)
+    {
+        EditorGUILayout.Space();
+        showMapbox = EditorGUILayout.Foldout(showMapbox, "Mapbox", true);
+        if (!showMapbox)
+        {
+            return;
+        }
+
+        DrawProviderSummary(TerrainDataProviderIds.Mapbox);
+
+        EditorGUI.BeginChangeCheck();
+        var accessToken = showSecrets
+            ? EditorGUILayout.TextField(new GUIContent("Access Token"), settings.MapboxAccessToken)
+            : EditorGUILayout.PasswordField(new GUIContent("Access Token"), settings.MapboxAccessToken);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(settings, "Edit Mapbox Access Token");
+            settings.MapboxAccessToken = accessToken;
+            EditorUtility.SetDirty(settings);
+        }
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("Paste", GUILayout.Width(80f)))
+            {
+                Undo.RecordObject(settings, "Paste Mapbox Access Token");
+                settings.MapboxAccessToken = EditorGUIUtility.systemCopyBuffer ?? string.Empty;
+                EditorUtility.SetDirty(settings);
+                GUIUtility.ExitGUI();
+            }
+
+            if (GUILayout.Button("Clear", GUILayout.Width(80f)))
+            {
+                Undo.RecordObject(settings, "Clear Mapbox Access Token");
+                settings.MapboxAccessToken = string.Empty;
+                EditorUtility.SetDirty(settings);
+                GUIUtility.ExitGUI();
+            }
+
+            GUILayout.FlexibleSpace();
+
+            if (GUILayout.Button("Open Docs", GUILayout.Width(120f)))
+            {
+                OpenProviderDocs(TerrainDataProviderIds.Mapbox);
+            }
+        }
+    }
+
+    private static void DrawGoogleMapsSection(TerrainDataServiceSettings settings)
+    {
+        EditorGUILayout.Space();
+        showGoogleMaps = EditorGUILayout.Foldout(showGoogleMaps, "Google Maps Platform", true);
+        if (!showGoogleMaps)
+        {
+            return;
+        }
+
+        DrawProviderSummary(TerrainDataProviderIds.GoogleMapsPlatform);
+
+        EditorGUI.BeginChangeCheck();
+        var apiKey = showSecrets
+            ? EditorGUILayout.TextField(new GUIContent("API Key"), settings.GoogleMapsApiKey)
+            : EditorGUILayout.PasswordField(new GUIContent("API Key"), settings.GoogleMapsApiKey);
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(settings, "Edit Google Maps API Key");
+            settings.GoogleMapsApiKey = apiKey;
+            EditorUtility.SetDirty(settings);
+        }
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("Paste", GUILayout.Width(80f)))
+            {
+                Undo.RecordObject(settings, "Paste Google Maps API Key");
+                settings.GoogleMapsApiKey = EditorGUIUtility.systemCopyBuffer ?? string.Empty;
+                EditorUtility.SetDirty(settings);
+                GUIUtility.ExitGUI();
+            }
+
+            if (GUILayout.Button("Clear", GUILayout.Width(80f)))
+            {
+                Undo.RecordObject(settings, "Clear Google Maps API Key");
+                settings.GoogleMapsApiKey = string.Empty;
+                EditorUtility.SetDirty(settings);
+                GUIUtility.ExitGUI();
+            }
+
+            GUILayout.FlexibleSpace();
+
+            if (GUILayout.Button("Open Docs", GUILayout.Width(120f)))
+            {
+                OpenProviderDocs(TerrainDataProviderIds.GoogleMapsPlatform);
+            }
+        }
+    }
+
+    private static void DrawProviderSummary(string providerId)
+    {
+        var provider = GetProvider(providerId);
+        if (provider == null)
+        {
+            return;
+        }
+
+        EditorGUILayout.HelpBox(
+            $"Access: {provider.accessModel}\nSupports imagery: {YesNo(provider.supportsImagery)}\nSupports elevation: {YesNo(provider.supportsElevation)}\n{provider.notes}",
+            MessageType.None);
+    }
+
+    private static void OpenProviderDocs(string providerId)
+    {
+        var provider = GetProvider(providerId);
+        if (provider == null || string.IsNullOrWhiteSpace(provider.docsUrl))
+        {
+            return;
+        }
+
+        Application.OpenURL(provider.docsUrl);
+    }
+
+    private static TerrainBuiltInProviderInfo GetProvider(string providerId)
+    {
+        var providers = TerrainDataServiceSettings.GetBuiltInProviders();
+        for (var i = 0; i < providers.Count; i++)
+        {
+            if (providers[i].providerId == providerId)
+            {
+                return providers[i];
+            }
+        }
+
+        return null;
+    }
+
+    private static string YesNo(bool value)
+    {
+        return value ? "Yes" : "No";
+    }
+}

@@ -1,0 +1,23 @@
+# Unity
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.sln
+*.user
+*.userprefs
+
+# Generated terrain data and local caches
+Assets/Terrain/
+Assets/Generated/
+
+# OS files
+.DS_Store
+Thumbs.db

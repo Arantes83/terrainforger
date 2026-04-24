@@ -1,0 +1,17 @@
+{
+  "name": "com.beatrizbarbosa.terrainforger",
+  "version": "0.1.0",
+  "displayName": "TerrainForger",
+  "description": "Unity Editor package for GIS data download, GeoTIFF export, and terrain tile import workflows.",
+  "unity": "2020.3",
+  "keywords": [
+    "terrain",
+    "gis",
+    "geotiff",
+    "editor",
+    "tools"
+  ],
+  "author": {
+    "name": "beatrizbarbosa-stack"
+  }
+}
