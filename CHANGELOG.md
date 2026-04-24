@@ -7,6 +7,9 @@
 - Added a `Coastline Source` dropdown so DEM export can switch between `GSHHG` and `OpenStreetMap`.
 - Simplified the coastline mask UI to always use auto-downloaded datasets, removing manual vector overrides and browse actions for both `GSHHG` and `OpenStreetMap`.
 - Removed the unused `Clamp Elevation` option from the export workflow.
+- Removed `OpenAerialMap` and `Copernicus Data Space` from the TerrainForger Data Services UI and supported provider list.
+- Updated provider documentation links to direct credential pages for `OpenTopography`, `Mapbox`, and `Google Maps Platform`.
+- Documented that API keys are stored only in the consuming project's local `UserSettings` and are not distributed with the package.
 - Added a dedicated top-level `TerrainForger` menu in the Unity editor instead of nesting the tools under the shared `Tools` menu.
 - Fixed GSHHG ZIP extraction to support the actual flat archive layout used by the official dataset.
 - Reduced shoreline mask bias by rasterizing the GSHHG land mask without the previous all-touched expansion behavior.

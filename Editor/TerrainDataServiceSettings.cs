@@ -10,15 +10,6 @@ public class TerrainDataServiceSettings : ScriptableSingleton<TerrainDataService
     private string openTopographyApiKey = string.Empty;
 
     [SerializeField]
-    private string copernicusClientId = string.Empty;
-
-    [SerializeField]
-    private string copernicusClientSecret = string.Empty;
-
-    [SerializeField]
-    private string copernicusInstanceId = string.Empty;
-
-    [SerializeField]
     private string mapboxAccessToken = string.Empty;
 
     [SerializeField]
@@ -31,24 +22,6 @@ public class TerrainDataServiceSettings : ScriptableSingleton<TerrainDataService
     {
         get => openTopographyApiKey;
         set => openTopographyApiKey = value ?? string.Empty;
-    }
-
-    public string CopernicusClientId
-    {
-        get => copernicusClientId;
-        set => copernicusClientId = value ?? string.Empty;
-    }
-
-    public string CopernicusClientSecret
-    {
-        get => copernicusClientSecret;
-        set => copernicusClientSecret = value ?? string.Empty;
-    }
-
-    public string CopernicusInstanceId
-    {
-        get => copernicusInstanceId;
-        set => copernicusInstanceId = value ?? string.Empty;
     }
 
     public string MapboxAccessToken
@@ -89,39 +62,11 @@ public class TerrainDataServiceSettings : ScriptableSingleton<TerrainDataService
         return string.Empty;
     }
 
-    public string GetSecret(string providerId)
-    {
-        if (string.Equals(providerId, TerrainDataProviderIds.CopernicusDataSpace, StringComparison.OrdinalIgnoreCase))
-        {
-            return CopernicusClientSecret;
-        }
-
-        return string.Empty;
-    }
-
     public string GetValue(string providerId, string key)
     {
         if (string.Equals(providerId, TerrainDataProviderIds.OpenTopography, StringComparison.OrdinalIgnoreCase))
         {
             return string.Equals(key, "apiKey", StringComparison.OrdinalIgnoreCase) ? OpenTopographyApiKey : string.Empty;
-        }
-
-        if (string.Equals(providerId, TerrainDataProviderIds.CopernicusDataSpace, StringComparison.OrdinalIgnoreCase))
-        {
-            if (string.Equals(key, "clientId", StringComparison.OrdinalIgnoreCase))
-            {
-                return CopernicusClientId;
-            }
-
-            if (string.Equals(key, "clientSecret", StringComparison.OrdinalIgnoreCase))
-            {
-                return CopernicusClientSecret;
-            }
-
-            if (string.Equals(key, "instanceId", StringComparison.OrdinalIgnoreCase))
-            {
-                return CopernicusInstanceId;
-            }
         }
 
         if (string.Equals(providerId, TerrainDataProviderIds.Mapbox, StringComparison.OrdinalIgnoreCase))
@@ -156,7 +101,7 @@ public class TerrainDataServiceSettings : ScriptableSingleton<TerrainDataService
             {
                 providerId = TerrainDataProviderIds.OpenTopography,
                 displayName = "OpenTopography",
-                docsUrl = "https://opentopography.org/developers",
+                docsUrl = "https://portal.opentopography.org/myopentopo",
                 accessModel = "Free API key",
                 supportsElevation = true,
                 supportsImagery = false,
@@ -164,29 +109,9 @@ public class TerrainDataServiceSettings : ScriptableSingleton<TerrainDataService
             },
             new TerrainBuiltInProviderInfo
             {
-                providerId = TerrainDataProviderIds.OpenAerialMap,
-                displayName = "OpenAerialMap",
-                docsUrl = "https://docs.openaerialmap.org/api/api/",
-                accessModel = "Open access",
-                supportsElevation = false,
-                supportsImagery = true,
-                notes = "Open imagery catalog. No API key required for metadata access."
-            },
-            new TerrainBuiltInProviderInfo
-            {
-                providerId = TerrainDataProviderIds.CopernicusDataSpace,
-                displayName = "Copernicus Data Space",
-                docsUrl = "https://documentation.dataspace.copernicus.eu/APIs.html",
-                accessModel = "Free account",
-                supportsElevation = false,
-                supportsImagery = true,
-                notes = "Free Copernicus access. OAuth client credentials are used for automation."
-            },
-            new TerrainBuiltInProviderInfo
-            {
                 providerId = TerrainDataProviderIds.Mapbox,
                 displayName = "Mapbox",
-                docsUrl = "https://docs.mapbox.com/help/glossary/access-token/",
+                docsUrl = "https://console.mapbox.com/account/access-tokens/",
                 accessModel = "Commercial access token",
                 supportsElevation = false,
                 supportsImagery = true,
@@ -196,7 +121,7 @@ public class TerrainDataServiceSettings : ScriptableSingleton<TerrainDataService
             {
                 providerId = TerrainDataProviderIds.GoogleMapsPlatform,
                 displayName = "Google Maps Platform",
-                docsUrl = "https://developers.google.com/maps/documentation/tile/satellite",
+                docsUrl = "https://console.cloud.google.com/apis/credentials",
                 accessModel = "API key with billing-enabled project",
                 supportsElevation = false,
                 supportsImagery = true,
@@ -209,8 +134,6 @@ public class TerrainDataServiceSettings : ScriptableSingleton<TerrainDataService
 public static class TerrainDataProviderIds
 {
     public const string OpenTopography = "opentopography";
-    public const string OpenAerialMap = "openaerialmap";
-    public const string CopernicusDataSpace = "copernicus-dataspace";
     public const string Mapbox = "mapbox";
     public const string GoogleMapsPlatform = "google-maps-platform";
 }
@@ -233,11 +156,6 @@ public class TerrainBuiltInProviderInfo
         {
             case TerrainDataProviderIds.OpenTopography:
                 return !string.IsNullOrWhiteSpace(settings.OpenTopographyApiKey);
-            case TerrainDataProviderIds.OpenAerialMap:
-                return true;
-            case TerrainDataProviderIds.CopernicusDataSpace:
-                return !string.IsNullOrWhiteSpace(settings.CopernicusClientId) &&
-                       !string.IsNullOrWhiteSpace(settings.CopernicusClientSecret);
             case TerrainDataProviderIds.Mapbox:
                 return !string.IsNullOrWhiteSpace(settings.MapboxAccessToken);
             case TerrainDataProviderIds.GoogleMapsPlatform:

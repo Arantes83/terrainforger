@@ -8,8 +8,6 @@ public static class TerrainDataServiceSettingsProvider
     private static bool showSecrets;
     private static bool showQgis = true;
     private static bool showOpenTopography = true;
-    private static bool showOpenAerialMap;
-    private static bool showCopernicus;
     private static bool showMapbox;
     private static bool showGoogleMaps;
 
@@ -24,8 +22,6 @@ public static class TerrainDataServiceSettingsProvider
             {
                 "terrain",
                 "opentopography",
-                "openaerialmap",
-                "copernicus",
                 "mapbox",
                 "google",
                 "api",
@@ -55,8 +51,6 @@ public static class TerrainDataServiceSettingsProvider
 
         DrawQgisSection(settings);
         DrawOpenTopographySection(settings);
-        DrawOpenAerialMapSection();
-        DrawCopernicusSection(settings);
         DrawMapboxSection(settings);
         DrawGoogleMapsSection(settings);
 
@@ -181,93 +175,6 @@ public static class TerrainDataServiceSettingsProvider
                 settings.QgisInstallFolder = string.Empty;
                 EditorUtility.SetDirty(settings);
                 GUIUtility.ExitGUI();
-            }
-        }
-    }
-
-    private static void DrawOpenAerialMapSection()
-    {
-        EditorGUILayout.Space();
-        showOpenAerialMap = EditorGUILayout.Foldout(showOpenAerialMap, "OpenAerialMap", true);
-        if (!showOpenAerialMap)
-        {
-            return;
-        }
-
-        DrawProviderSummary(TerrainDataProviderIds.OpenAerialMap);
-        EditorGUILayout.HelpBox(
-            "No API key is required for the public metadata API. Imagery availability and licensing vary by source item.",
-            MessageType.None);
-
-        using (new EditorGUILayout.HorizontalScope())
-        {
-            GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Open Docs", GUILayout.Width(120f)))
-            {
-                OpenProviderDocs(TerrainDataProviderIds.OpenAerialMap);
-            }
-        }
-    }
-
-    private static void DrawCopernicusSection(TerrainDataServiceSettings settings)
-    {
-        EditorGUILayout.Space();
-        showCopernicus = EditorGUILayout.Foldout(showCopernicus, "Copernicus Data Space", true);
-        if (!showCopernicus)
-        {
-            return;
-        }
-
-        DrawProviderSummary(TerrainDataProviderIds.CopernicusDataSpace);
-
-        EditorGUI.BeginChangeCheck();
-        var clientId = EditorGUILayout.TextField(new GUIContent("Client ID"), settings.CopernicusClientId);
-        var clientSecret = showSecrets
-            ? EditorGUILayout.TextField(new GUIContent("Client Secret"), settings.CopernicusClientSecret)
-            : EditorGUILayout.PasswordField(new GUIContent("Client Secret"), settings.CopernicusClientSecret);
-        var instanceId = EditorGUILayout.TextField(new GUIContent("Instance ID"), settings.CopernicusInstanceId);
-        if (EditorGUI.EndChangeCheck())
-        {
-            Undo.RecordObject(settings, "Edit Copernicus Credentials");
-            settings.CopernicusClientId = clientId;
-            settings.CopernicusClientSecret = clientSecret;
-            settings.CopernicusInstanceId = instanceId;
-            EditorUtility.SetDirty(settings);
-        }
-
-        using (new EditorGUILayout.HorizontalScope())
-        {
-            if (GUILayout.Button("Paste Client ID", GUILayout.Width(120f)))
-            {
-                Undo.RecordObject(settings, "Paste Copernicus Client ID");
-                settings.CopernicusClientId = EditorGUIUtility.systemCopyBuffer ?? string.Empty;
-                EditorUtility.SetDirty(settings);
-                GUIUtility.ExitGUI();
-            }
-
-            if (GUILayout.Button("Paste Secret", GUILayout.Width(100f)))
-            {
-                Undo.RecordObject(settings, "Paste Copernicus Secret");
-                settings.CopernicusClientSecret = EditorGUIUtility.systemCopyBuffer ?? string.Empty;
-                EditorUtility.SetDirty(settings);
-                GUIUtility.ExitGUI();
-            }
-
-            if (GUILayout.Button("Clear", GUILayout.Width(80f)))
-            {
-                Undo.RecordObject(settings, "Clear Copernicus Credentials");
-                settings.CopernicusClientId = string.Empty;
-                settings.CopernicusClientSecret = string.Empty;
-                settings.CopernicusInstanceId = string.Empty;
-                EditorUtility.SetDirty(settings);
-                GUIUtility.ExitGUI();
-            }
-
-            GUILayout.FlexibleSpace();
-
-            if (GUILayout.Button("Open Docs", GUILayout.Width(120f)))
-            {
-                OpenProviderDocs(TerrainDataProviderIds.CopernicusDataSpace);
             }
         }
     }

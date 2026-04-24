@@ -21,7 +21,12 @@ Unity Editor package para baixar dados GIS, exportar GeoTIFF para RAW/PNG e impo
   - OpenTopography
   - Mapbox
   - Google Maps Platform
-  - Copernicus Data Space
+
+## Seguranca das credenciais
+
+- As credenciais do addon ficam salvas localmente em `UserSettings/TerrainDataServiceSettings.asset` do projeto Unity consumidor.
+- Esse arquivo fica fora do package distribuido e o repositorio ignora `UserSettings/` no `.gitignore`.
+- O package nao inclui API keys hardcoded: os campos de credenciais no codigo iniciam vazios e os valores sao lidos em tempo de execucao das settings locais do projeto.
 
 ## Instalacao
 
