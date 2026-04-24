@@ -1,5 +1,9 @@
 # TerrainForger
 
+<p align="center">
+  <img src="Documentation~/images/TerrainForger.png" alt="TerrainForger" width="420" />
+</p>
+
 Unity Editor package para baixar dados GIS, exportar GeoTIFF para RAW/PNG e importar tiles de terreno.
 
 ## Instalacao
