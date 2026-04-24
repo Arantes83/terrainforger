@@ -12,3 +12,6 @@
 - Added a `LICENSE` file with the MIT license text.
 - Replaced DEM coastline clipping by elevation threshold with an optional GSHHG-based land mask workflow.
 - Added export UI fields for GSHHG vector selection and configurable water elevation during DEM export.
+- Added automatic download and local caching of the official GSHHG dataset when no custom vector override is provided.
+- Added a GSHHG resolution dropdown with `Auto`, `Full`, `High`, `Intermediate`, `Low`, and `Crude` modes.
+- Added automatic GSHHG resolution selection by project region extent when the dropdown is set to `Auto`.
