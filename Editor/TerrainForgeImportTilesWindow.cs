@@ -7,6 +7,7 @@ public class TerrainForgeImportTilesWindow : EditorWindow
     private const string PngInputDefault = "Assets/Terrain/PNG";
 
     private Vector2 scrollPosition;
+    private static readonly System.Collections.Generic.List<string> workflowLog = new System.Collections.Generic.List<string>();
 
     [MenuItem("TerrainForger/Import Tiles")]
     public static void Open()
@@ -87,6 +88,8 @@ public class TerrainForgeImportTilesWindow : EditorWindow
             RunImport(settings);
         }
 
+        DrawWorkflowLog();
+        TerrainForgeWindowUtility.DrawSettingsFooter(settings);
         EditorGUILayout.EndScrollView();
     }
 
@@ -95,6 +98,7 @@ public class TerrainForgeImportTilesWindow : EditorWindow
         try
         {
             TerrainForgeWindowUtility.ExecuteWithRuntimeConfig(settings, TerrainTileImporter.Import);
+            AddLog("Terrain tiles imported successfully.");
             EditorUtility.DisplayDialog("Import Complete", "Terrain tiles imported successfully.", "OK");
         }
         catch (System.Exception ex)
@@ -108,5 +112,32 @@ public class TerrainForgeImportTilesWindow : EditorWindow
     {
         settings.inputFolder = RawInputDefault;
         settings.satelliteOutputFolder = PngInputDefault;
+    }
+
+    private static void AddLog(string message)
+    {
+        workflowLog.Add(string.Format("{0:HH:mm:ss} - {1}", System.DateTime.Now, message));
+        while (workflowLog.Count > 12)
+        {
+            workflowLog.RemoveAt(0);
+        }
+    }
+
+    private static void DrawWorkflowLog()
+    {
+        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+        {
+            EditorGUILayout.LabelField("Processing Log", EditorStyles.boldLabel);
+            if (workflowLog.Count == 0)
+            {
+                EditorGUILayout.HelpBox("No import steps have run in this tool window yet.", MessageType.Info);
+                return;
+            }
+
+            for (var i = 0; i < workflowLog.Count; i++)
+            {
+                EditorGUILayout.LabelField(workflowLog[i]);
+            }
+        }
     }
 }

@@ -15,6 +15,7 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
     private string satellitePreviewSourcePath = string.Empty;
     private string satellitePreviewStatus = "No satellite preview loaded.";
     private bool showBounds = true;
+    private static readonly System.Collections.Generic.List<string> workflowLog = new System.Collections.Generic.List<string>();
 
     [MenuItem("TerrainForger/Get GIS Data")]
     public static void Open()
@@ -43,6 +44,7 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
             "TerrainForger: Get GIS Data",
             "Load a local GeoTIFF or KAP chart, auto-fill bounds, choose DEM and imagery providers, and save downloaded data inside Assets/Terrain.");
         TerrainForgeWindowUtility.DrawPathButtons(settings, includeGeoTiffButton: false);
+        var usingSourceBounds = HasUsableSourceFile(settings);
 
         var serializedObject = new SerializedObject(settings);
         serializedObject.Update();
@@ -53,8 +55,8 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
             EditorGUILayout.HelpBox(
                 "Choose a local source file here. Use 'Store Source' to copy it into Assets/Terrain, and 'Refill Bounds From Source' only when you want to sync the bounds back from the selected file.",
                 MessageType.None);
-            TerrainForgeWindowUtility.DrawProperty(serializedObject, "localSourceType", "Source Type");
-            TerrainForgeWindowUtility.DrawProperty(serializedObject, "localSourcePath", "Source File");
+            TerrainForgeWindowUtility.DrawProperty(serializedObject, "localSourceType", "Source Type", "Defines whether the local source is a georeferenced GeoTIFF DEM or a KAP chart/raster. When a source is selected, TerrainForger uses its exact bounds for DEM and SAT downloads.");
+            TerrainForgeWindowUtility.DrawProperty(serializedObject, "localSourcePath", "Source File", "Absolute or project-relative path to the source raster whose geospatial extent must drive the download bounds.");
 
             using (new EditorGUILayout.HorizontalScope())
             {
@@ -114,9 +116,9 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Satellite Resolution", EditorStyles.boldLabel);
-            settings.satelliteResolution = EditorGUILayout.FloatField("Resolution", settings.satelliteResolution);
+            settings.satelliteResolution = EditorGUILayout.FloatField(new GUIContent("Resolution", "Desired satellite raster resolution. Meters per pixel preserves GIS scale; pixels per meter increases detail and file size."), settings.satelliteResolution);
             settings.satelliteResolution = Mathf.Max(0.0001f, settings.satelliteResolution);
-            settings.satelliteResolutionUnit = (TerrainForgerSatelliteResolutionUnit)EditorGUILayout.EnumPopup("Unit", settings.satelliteResolutionUnit);
+            settings.satelliteResolutionUnit = (TerrainForgerSatelliteResolutionUnit)EditorGUILayout.EnumPopup(new GUIContent("Unit", "How the satellite resolution value is interpreted for the computed download plan."), settings.satelliteResolutionUnit);
 
             var plan = TerrainForgerGisDataUtility.BuildSatelliteDownloadPlan(settings);
             if (plan.isValid)
@@ -140,7 +142,12 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
 
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
-            showBounds = EditorGUILayout.Foldout(showBounds, "Map Bounds", true);
+            showBounds = EditorGUILayout.Foldout(showBounds, usingSourceBounds ? "Map Bounds (locked to Source File)" : "Map Bounds", true);
+            if (usingSourceBounds)
+            {
+                EditorGUILayout.HelpBox("A source file is selected. TerrainForger locks manual map bounds and uses the exact geospatial extent read from the source for DEM and SAT downloads.", MessageType.Info);
+            }
+            using (new EditorGUI.DisabledScope(usingSourceBounds))
             if (showBounds)
             {
                 settings.northBound = TerrainForgeWindowUtility.DrawLatitudeDdmField("North Bound", settings.northBound);
@@ -193,22 +200,24 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
 
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (GUILayout.Button("Download DEM"))
+            if (GUILayout.Button(new GUIContent("Download DEM", "Download a DEM GeoTIFF using the active bounds. If a source file is selected, its bounds are refilled immediately before the request.")))
             {
                 RunDownloadDem(settings);
             }
 
-            if (GUILayout.Button("Download Satellite"))
+            if (GUILayout.Button(new GUIContent("Download Satellite", "Download satellite imagery using the active bounds. If a source file is selected, its bounds are refilled immediately before the request.")))
             {
                 RunDownloadSatellite(settings);
             }
         }
 
-        if (GUILayout.Button("Get Selected GIS Data", GUILayout.Height(32f)))
+        if (GUILayout.Button(new GUIContent("Get Selected GIS Data", "Run the complete configured DEM and satellite download workflow."), GUILayout.Height(32f)))
         {
             RunDownloadAll(settings);
         }
 
+        DrawWorkflowLog();
+        TerrainForgeWindowUtility.DrawSettingsFooter(settings);
         EditorGUILayout.EndScrollView();
     }
 
@@ -384,6 +393,8 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
         {
             settings.localSourceType = TerrainForgerLocalSourceType.GeoTiff;
         }
+        TerrainForgerGisDataUtility.RefillBoundsFromLocalSource(settings);
+        AddLog("Source file loaded and bounds refilled from source.");
         settings.SaveSettings();
     }
 
@@ -392,6 +403,7 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
         try
         {
             TerrainForgerGisDataUtility.StoreLocalSource(settings);
+            AddLog("Local source stored in Assets/Terrain.");
             EditorUtility.DisplayDialog("Local Source Stored", "The source file was copied into Assets/Terrain.", "OK");
         }
         catch (System.Exception ex)
@@ -406,6 +418,7 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
         try
         {
             TerrainForgerGisDataUtility.RefillBoundsFromLocalSource(settings);
+            AddLog("Bounds refilled from source file.");
             EditorUtility.DisplayDialog("Bounds Updated", "The bounds were refilled from the selected source file.", "OK");
         }
         catch (System.Exception ex)
@@ -419,7 +432,9 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
     {
         try
         {
+            EnsureSourceBounds(settings);
             TerrainForgerGisDataUtility.DownloadDem(settings);
+            AddLog("DEM downloaded using active bounds.");
             EditorUtility.DisplayDialog("DEM Download Complete", "The DEM GeoTIFF was saved in Assets/Terrain/GeoTIFF. You can now load its preview in the DEM Preview section.", "OK");
         }
         catch (System.Exception ex)
@@ -433,8 +448,10 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
     {
         try
         {
+            EnsureSourceBounds(settings);
             var plan = TerrainForgerGisDataUtility.BuildSatelliteDownloadPlan(settings);
             TerrainForgerGisDataUtility.DownloadSatellite(settings);
+            AddLog("Satellite GeoTIFF downloaded using active bounds.");
             var detail = plan.isValid && plan.requiresTiling
                 ? $" The request used a {plan.tilesX} x {plan.tilesY} tile mosaic."
                 : string.Empty;
@@ -451,7 +468,9 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
     {
         try
         {
+            EnsureSourceBounds(settings);
             TerrainForgerGisDataUtility.DownloadSelectedData(settings);
+            AddLog("Selected GIS data downloaded using active bounds.");
             EditorUtility.DisplayDialog("GIS Data Complete", "The selected GIS data sources were processed and saved under Assets/Terrain.", "OK");
         }
         catch (System.Exception ex)
@@ -595,5 +614,54 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
         }
 
         satellitePreviewSourcePath = string.Empty;
+    }
+
+    private static bool HasUsableSourceFile(TerrainForgeWorkflowSettings settings)
+    {
+        if (settings == null || settings.localSourceType == TerrainForgerLocalSourceType.None || string.IsNullOrWhiteSpace(settings.localSourcePath))
+        {
+            return false;
+        }
+
+        var fullPath = TerrainForgeWindowUtility.ResolveFolderPath(settings.localSourcePath);
+        return File.Exists(fullPath);
+    }
+
+    private static void EnsureSourceBounds(TerrainForgeWorkflowSettings settings)
+    {
+        if (!HasUsableSourceFile(settings))
+        {
+            return;
+        }
+
+        TerrainForgerGisDataUtility.RefillBoundsFromLocalSource(settings);
+        AddLog("Source bounds enforced before processing.");
+    }
+
+    private static void AddLog(string message)
+    {
+        workflowLog.Add(string.Format("{0:HH:mm:ss} - {1}", System.DateTime.Now, message));
+        while (workflowLog.Count > 12)
+        {
+            workflowLog.RemoveAt(0);
+        }
+    }
+
+    private static void DrawWorkflowLog()
+    {
+        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+        {
+            EditorGUILayout.LabelField("Processing Log", EditorStyles.boldLabel);
+            if (workflowLog.Count == 0)
+            {
+                EditorGUILayout.HelpBox("No processing steps have run in this tool window yet.", MessageType.Info);
+                return;
+            }
+
+            for (var i = 0; i < workflowLog.Count; i++)
+            {
+                EditorGUILayout.LabelField(workflowLog[i]);
+            }
+        }
     }
 }
