@@ -9,11 +9,14 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
     private static readonly int[] SatelliteResolutionOptions = { 512, 1024, 2048, 4096 };
     private const string RawOutputDefault = "Assets/Terrain/Raw";
     private const string PngOutputDefault = "Assets/Terrain/PNG";
+    private const string DemGeoTiffFolder = "Assets/Terrain/GeoTIFF";
+    private const string SatelliteGeoTiffFolder = "Assets/Terrain/SAT";
 
     private Vector2 scrollPosition;
     private Texture2D demGridPreviewTexture;
     private string demGridPreviewSourcePath = string.Empty;
     private string demGridPreviewStatus = "No DEM preview loaded.";
+    private static readonly System.Collections.Generic.List<string> workflowLog = new System.Collections.Generic.List<string>();
 
     [MenuItem("TerrainForger/Geotiff2Raw Export")]
     public static void Open()
@@ -35,6 +38,7 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
 
         var settings = TerrainForgeWorkflowSettings.instance;
         SyncDefaultSourcePaths(settings);
+        RefreshSourcePathsFromFolders(settings);
         TerrainForgeWindowUtility.DrawSettingsHeader(
             settings,
             "TerrainForger: Geotiff2Raw Export",
@@ -135,6 +139,8 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
             }
         }
 
+        DrawWorkflowLog();
+        TerrainForgeWindowUtility.DrawSettingsFooter(settings);
         EditorGUILayout.EndScrollView();
     }
 
@@ -257,6 +263,102 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
         }
     }
 
+    private static void RefreshSourcePathsFromFolders(TerrainForgeWorkflowSettings settings)
+    {
+        var latestDemPath = FindLatestGeoTiffAssetPath(DemGeoTiffFolder);
+        if (ShouldReplaceSourcePath(settings.geoTiffPath, latestDemPath))
+        {
+            settings.geoTiffPath = latestDemPath;
+            settings.lastDemGeoTiffPath = latestDemPath;
+        }
+
+        var latestSatellitePath = FindLatestGeoTiffAssetPath(SatelliteGeoTiffFolder);
+        if (ShouldReplaceSourcePath(settings.satelliteGeoTiffPath, latestSatellitePath))
+        {
+            settings.satelliteGeoTiffPath = latestSatellitePath;
+            settings.lastSatelliteImagePath = latestSatellitePath;
+        }
+    }
+
+    private static bool ShouldReplaceSourcePath(string currentAssetPath, string candidateAssetPath)
+    {
+        if (string.IsNullOrWhiteSpace(candidateAssetPath))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(currentAssetPath))
+        {
+            return true;
+        }
+
+        if (string.Equals(currentAssetPath, candidateAssetPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var currentFullPath = TerrainForgeWindowUtility.ResolveFolderPath(currentAssetPath);
+        var candidateFullPath = TerrainForgeWindowUtility.ResolveFolderPath(candidateAssetPath);
+
+        if (!File.Exists(currentFullPath))
+        {
+            return true;
+        }
+
+        if (!File.Exists(candidateFullPath))
+        {
+            return false;
+        }
+
+        return File.GetLastWriteTimeUtc(candidateFullPath) > File.GetLastWriteTimeUtc(currentFullPath);
+    }
+
+    private static string FindLatestGeoTiffAssetPath(string assetFolder)
+    {
+        var folderFullPath = TerrainForgeWindowUtility.ResolveFolderPath(assetFolder);
+        if (!Directory.Exists(folderFullPath))
+        {
+            return string.Empty;
+        }
+
+        FileInfo latestFile = null;
+        foreach (var filePath in Directory.EnumerateFiles(folderFullPath, "*.*", SearchOption.TopDirectoryOnly))
+        {
+            if (!IsGeoTiffFile(filePath))
+            {
+                continue;
+            }
+
+            var fileInfo = new FileInfo(filePath);
+            if (latestFile == null || fileInfo.LastWriteTimeUtc > latestFile.LastWriteTimeUtc)
+            {
+                latestFile = fileInfo;
+            }
+        }
+
+        return latestFile == null ? string.Empty : ToAssetPath(latestFile.FullName);
+    }
+
+    private static bool IsGeoTiffFile(string path)
+    {
+        var extension = Path.GetExtension(path);
+        return string.Equals(extension, ".tif", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(extension, ".tiff", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ToAssetPath(string fullPath)
+    {
+        var normalizedFullPath = Path.GetFullPath(fullPath).Replace('\\', '/');
+        var normalizedAssetsPath = Path.GetFullPath(Application.dataPath).Replace('\\', '/');
+
+        if (normalizedFullPath.StartsWith(normalizedAssetsPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return "Assets" + normalizedFullPath.Substring(normalizedAssetsPath.Length);
+        }
+
+        return normalizedFullPath;
+    }
+
     private static void BrowseGeoTiff(ref string targetPath, string title)
     {
         var startFolder = string.IsNullOrWhiteSpace(targetPath)
@@ -363,12 +465,40 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
         try
         {
             TerrainForgeWindowUtility.ExecuteWithRuntimeConfig(settings, exportAction);
+            AddLog(title + ": " + message);
             EditorUtility.DisplayDialog(title, message, "OK");
         }
         catch (System.Exception ex)
         {
             Debug.LogException(ex);
             EditorUtility.DisplayDialog("Export Failed", ex.Message, "OK");
+        }
+    }
+
+    private static void AddLog(string message)
+    {
+        workflowLog.Add(string.Format("{0:HH:mm:ss} - {1}", System.DateTime.Now, message));
+        while (workflowLog.Count > 12)
+        {
+            workflowLog.RemoveAt(0);
+        }
+    }
+
+    private static void DrawWorkflowLog()
+    {
+        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+        {
+            EditorGUILayout.LabelField("Processing Log", EditorStyles.boldLabel);
+            if (workflowLog.Count == 0)
+            {
+                EditorGUILayout.HelpBox("No export steps have run in this tool window yet.", MessageType.Info);
+                return;
+            }
+
+            for (var i = 0; i < workflowLog.Count; i++)
+            {
+                EditorGUILayout.LabelField(workflowLog[i]);
+            }
         }
     }
 }

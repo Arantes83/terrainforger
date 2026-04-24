@@ -52,6 +52,7 @@ public static class TerrainForgerGisDataUtility
         }
         else
         {
+            settings.satelliteGeoTiffPath = destinationAssetPath;
             settings.lastSatelliteImagePath = destinationAssetPath;
         }
 
@@ -436,6 +437,7 @@ public static class TerrainForgerGisDataUtility
             DownloadAndWarpMapboxTiles(accessToken, plan, tempRoot, outputFullPath, west, south, east, north, westMercator, southMercator, eastMercator, northMercator);
             DeletePreviousSatelliteImages(previousSatelliteImagePath);
 
+            settings.satelliteGeoTiffPath = outputAssetPath;
             settings.lastSatelliteImagePath = outputAssetPath;
             AssetDatabase.Refresh();
             settings.SaveSettings();

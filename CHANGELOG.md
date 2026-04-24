@@ -1,31 +1,124 @@
 # Changelog
 
-## [Unreleased] - 2026-04-24
+## 2026-04-24
 
-- Moved the auto-downloaded GSHHG cache from `Library/TerrainForger/GSHHG` to `Assets/Terrain/GSHHG` so the shoreline dataset stays visible inside the Unity project.
-- Added an OpenStreetMap coastline alternative using processed OSM land polygons in WGS84 as a second shoreline mask source.
-- Added a `Coastline Source` dropdown so DEM export can switch between `GSHHG` and `OpenStreetMap`.
-- Simplified the coastline mask UI to always use auto-downloaded datasets, removing manual vector overrides and browse actions for both `GSHHG` and `OpenStreetMap`.
-- Removed the unused `Clamp Elevation` option from the export workflow.
-- Removed `OpenAerialMap` and `Copernicus Data Space` from the TerrainForger Data Services UI and supported provider list.
-- Updated provider documentation links to direct credential pages for `OpenTopography`, `Mapbox`, and `Google Maps Platform`.
-- Documented that API keys are stored only in the consuming project's local `UserSettings` and are not distributed with the package.
-- Added a dedicated top-level `TerrainForger` menu in the Unity editor instead of nesting the tools under the shared `Tools` menu.
-- Fixed GSHHG ZIP extraction to support the actual flat archive layout used by the official dataset.
-- Reduced shoreline mask bias by rasterizing the GSHHG land mask without the previous all-touched expansion behavior.
+### Core / Root Addon
 
-## [0.1.0] - 2026-04-23
+- Centralized **Service Settings** at the root `TerrainForger` menu instead of keeping duplicated buttons inside individual modules.
+- Forced automatic opening of **Service Settings** on the first addon load to avoid invalid first-time configuration states.
+- Removed duplicated and unnecessary menu entry `TerrainForger/TerrainForger`.
 
-- Initial UPM package structure for TerrainForger.
-- Added `package.json`, editor assembly definition, and package documentation.
-- Isolated the addon from the Unity project so it can be installed as a standalone package.
-- Renamed the published package identifier to `com.arantes83.terrainforger`.
-- Added GitHub-ready README improvements, including the TerrainForger logo.
-- Declared Unity package dependencies for `com.unity.modules.terrain` and `com.unity.modules.imageconversion`.
-- Added package publication metadata: `documentationUrl`, `changelogUrl`, and MIT license.
-- Added a `LICENSE` file with the MIT license text.
-- Replaced DEM coastline clipping by elevation threshold with an optional GSHHG-based land mask workflow.
-- Added export UI fields for GSHHG vector selection and configurable water elevation during DEM export.
-- Added automatic download and local caching of the official GSHHG dataset when no custom vector override is provided.
-- Added a GSHHG resolution dropdown with `Auto`, `Full`, `High`, `Intermediate`, `Low`, and `Crude` modes.
-- Added automatic GSHHG resolution selection by project region extent when the dropdown is set to `Auto`.
+---
+
+### Bounds / Source File Safety
+
+- When using a **Source File**, the addon now forces DEM and SAT downloads to use the exact bounds extracted from the source file.
+- Added protection against user error by preventing conflicting manual **Map Bounds** usage when a source file is active.
+- `Refill Bounds From Source` now always refreshes bounds using the exact source geometry.
+
+---
+
+### GeoTIFF2Raw Export
+
+- Fixed automatic synchronization of:
+  - `DEM GeoTIFF`
+  - `Satellite GeoTIFF`
+
+inside **Source And Output**.
+
+The window now automatically searches and updates using the newest valid `.tif/.tiff` files found in:
+
+- `Assets/Terrain/GeoTIFF`
+- `Assets/Terrain/SAT`
+
+instead of keeping stale references.
+
+---
+
+### Preview Consistency
+
+- DEM Preview and SAT Preview were adjusted to maintain the same:
+  - resolution
+  - bounds coverage
+  - geographic area
+
+as the Source Preview.
+
+This avoids mismatched previews and incorrect terrain interpretation.
+
+---
+
+### Import Resolution
+
+- Forced Unity texture import to preserve the exact generated PNG resolution.
+
+Example:
+
+- Generated file: `4096x4096`
+- Previous Unity import: `2048x2048`
+- New behavior: `4096x4096`
+
+This guarantees heightmap and satellite precision consistency.
+
+---
+
+### UI / UX Improvements
+
+- Added contextual **tooltips** to tool options across the addon to explain the purpose of each field and operation.
+- Moved:
+  - `Save Tool Settings`
+  - `Reset Tool Settings`
+
+from the top of tool windows to the bottom for better workflow ergonomics.
+
+---
+
+### Processing Feedback
+
+- Added visual processing log panels inside each tool window.
+
+These logs now show:
+
+- completed steps
+- current execution stage
+- processing progress visibility
+
+This improves debugging and operational clarity for long GIS workflows.
+
+---
+
+### Editor Stability Fixes
+
+- Fixed compiler error:
+
+`CS0104: 'Object' is an ambiguous reference between 'UnityEngine.Object' and 'object'`
+
+by replacing ambiguous calls:
+
+```csharp
+Object.DestroyImmediate(...)
+```
+
+with explicit calls:
+
+```csharp
+UnityEngine.Object.DestroyImmediate(...)
+```
+
+Affected files:
+
+- `TerrainTileImporter.cs`
+- `TerrainForgeWindowUtility.cs`
+
+---
+
+### Documentation
+
+- Updated project documentation to reflect:
+  - new workflow protections
+  - source-file-first pipeline behavior
+  - root settings architecture
+  - import precision improvements
+  - processing logs
+  - preview consistency
+  - GeoTIFF synchronization fixes

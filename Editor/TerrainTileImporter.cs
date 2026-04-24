@@ -237,6 +237,7 @@ public static class TerrainTileImporter
             return;
         }
 
+        ConfigurePngImporterForExactResolution(satelliteAssetPath);
         AssetDatabase.ImportAsset(satelliteAssetPath, ImportAssetOptions.ForceUpdate);
         var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(satelliteAssetPath);
         if (texture == null)
@@ -622,6 +623,48 @@ public static class TerrainTileImporter
             maxX = Mathf.Max(maxX, nextMaxX);
             minZ = Mathf.Min(minZ, nextMinZ);
             maxZ = Mathf.Max(maxZ, nextMaxZ);
+        }
+    }
+
+    private static void ConfigurePngImporterForExactResolution(string assetPath)
+    {
+        var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+        if (importer == null)
+        {
+            return;
+        }
+
+        importer.textureType = TextureImporterType.Default;
+        importer.mipmapEnabled = false;
+        importer.isReadable = true;
+        importer.npotScale = TextureImporterNPOTScale.None;
+        importer.textureCompression = TextureImporterCompression.Uncompressed;
+        importer.maxTextureSize = ResolveMaxTextureSize(assetPath);
+        importer.SaveAndReimport();
+    }
+
+    private static int ResolveMaxTextureSize(string assetPath)
+    {
+        var fullPath = ResolveFolderPath(assetPath);
+        if (!File.Exists(fullPath))
+        {
+            return 8192;
+        }
+
+        var bytes = File.ReadAllBytes(fullPath);
+        var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+        try
+        {
+            if (!texture.LoadImage(bytes, markNonReadable: false))
+            {
+                return 8192;
+            }
+
+            return Mathf.Clamp(Mathf.NextPowerOfTwo(Mathf.Max(texture.width, texture.height)), 32, 16384);
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(texture);
         }
     }
 }

@@ -8,20 +8,20 @@ public static class TerrainForgeWindowUtility
     {
         EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(description, MessageType.Info);
+    }
 
+    public static void DrawSettingsFooter(TerrainForgeWorkflowSettings settings)
+    {
+        EditorGUILayout.Space();
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (GUILayout.Button("Service Settings", GUILayout.Width(120f)))
-            {
-                TerrainDataServiceSettingsProvider.OpenSettings();
-            }
-
-            if (GUILayout.Button("Save Tool Settings", GUILayout.Width(140f)))
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button(new GUIContent("Save Tool Settings", "Persist all current TerrainForger workflow values into UserSettings/TerrainForgeWorkflowSettings.asset."), GUILayout.Width(160f)))
             {
                 settings.SaveSettings();
             }
 
-            if (GUILayout.Button("Reset Tool Settings", GUILayout.Width(140f)))
+            if (GUILayout.Button(new GUIContent("Reset Tool Settings", "Reset this tool workflow settings to TerrainForger defaults. Credentials are not affected."), GUILayout.Width(160f)))
             {
                 ResetSettings(settings);
                 GUIUtility.ExitGUI();
@@ -78,10 +78,15 @@ public static class TerrainForgeWindowUtility
 
     public static void DrawProperty(SerializedObject serializedObject, string propertyName, string label)
     {
+        DrawProperty(serializedObject, propertyName, label, string.Empty);
+    }
+
+    public static void DrawProperty(SerializedObject serializedObject, string propertyName, string label, string tooltip)
+    {
         var property = serializedObject.FindProperty(propertyName);
         if (property != null)
         {
-            EditorGUILayout.PropertyField(property, new GUIContent(label), includeChildren: true);
+            EditorGUILayout.PropertyField(property, new GUIContent(label, tooltip), includeChildren: true);
         }
     }
 
@@ -246,7 +251,7 @@ public static class TerrainForgeWindowUtility
         }
         finally
         {
-            Object.DestroyImmediate(runtimeConfig);
+            UnityEngine.Object.DestroyImmediate(runtimeConfig);
         }
     }
 
@@ -260,7 +265,7 @@ public static class TerrainForgeWindowUtility
         }
         finally
         {
-            Object.DestroyImmediate(defaults);
+            UnityEngine.Object.DestroyImmediate(defaults);
         }
     }
 }
