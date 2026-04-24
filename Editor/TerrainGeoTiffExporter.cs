@@ -19,6 +19,7 @@ public static class TerrainGeoTiffExporter
     private const string GshhgArchiveFileName = "gshhg-shp-2.3.7.zip";
     private const string GshhgArchiveUrl = "https://ftp.soest.hawaii.edu/gshhg/gshhg-shp-2.3.7.zip";
     private const string GshhgExtractedFolderName = "gshhg-shp-2.3.7";
+    private const string GshhgAssetCachePath = "Assets/Terrain/GSHHG";
 
     public static void ExportToRawTiles(TerrainTileImportConfig config)
     {
@@ -374,8 +375,7 @@ public static class TerrainGeoTiffExporter
 
     private static string GetGshhgCacheRoot()
     {
-        var projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
-        return Path.Combine(projectRoot, "Library", "TerrainForger", "GSHHG");
+        return ResolvePath(GshhgAssetCachePath);
     }
 
     private static string FindGshhgDatasetRoot(string cacheRoot)
