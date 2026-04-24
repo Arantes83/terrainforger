@@ -11,6 +11,16 @@ public enum TerrainForgerSatelliteResolutionUnit
     MetersPerPixel
 }
 
+public enum TerrainForgerGshhgResolutionMode
+{
+    Auto,
+    Full,
+    High,
+    Intermediate,
+    Low,
+    Crude
+}
+
 public struct TerrainForgerSatelliteDownloadPlan
 {
     public bool isValid;

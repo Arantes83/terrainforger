@@ -54,6 +54,8 @@ public class TerrainTileImportConfig : ScriptableObject
     public string qgisInstallFolder = string.Empty;
     [Tooltip("When enabled, TerrainForger uses a GSHHG land polygon vector to decide which samples remain land during DEM export.")]
     public bool exportUseGshhgMask;
+    [Tooltip("Resolution used when selecting the GSHHG coastline dataset. Auto chooses based on the project region extent.")]
+    public TerrainForgerGshhgResolutionMode gshhgResolutionMode = TerrainForgerGshhgResolutionMode.Auto;
     [Tooltip("Path to a GSHHG land polygon vector file, usually a .shp extracted from the official dataset.")]
     public string gshhgVectorPath = string.Empty;
     [Tooltip("Elevation assigned to DEM samples outside the GSHHG land mask.")]

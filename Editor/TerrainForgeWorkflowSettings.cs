@@ -55,6 +55,7 @@ public class TerrainForgeWorkflowSettings : ScriptableSingleton<TerrainForgeWork
     public string satelliteOutputFolder = "Assets/Terrain/PNG";
     public int satelliteTileResolution = 1024;
     public bool exportUseGshhgMask;
+    public TerrainForgerGshhgResolutionMode gshhgResolutionMode = TerrainForgerGshhgResolutionMode.Auto;
     public string gshhgVectorPath = string.Empty;
     public float exportWaterMaskElevation = -10f;
     public bool exportClampElevation = true;
@@ -110,6 +111,7 @@ public class TerrainForgeWorkflowSettings : ScriptableSingleton<TerrainForgeWork
         satelliteOutputFolder = config.satelliteOutputFolder;
         satelliteTileResolution = config.satelliteTileResolution;
         exportUseGshhgMask = config.exportUseGshhgMask;
+        gshhgResolutionMode = config.gshhgResolutionMode;
         gshhgVectorPath = config.gshhgVectorPath;
         exportWaterMaskElevation = config.exportWaterMaskElevation;
         exportClampElevation = config.exportClampElevation;
@@ -158,6 +160,7 @@ public class TerrainForgeWorkflowSettings : ScriptableSingleton<TerrainForgeWork
         config.satelliteTileResolution = satelliteTileResolution;
         config.qgisInstallFolder = TerrainDataServiceSettings.instance.QgisInstallFolder;
         config.exportUseGshhgMask = exportUseGshhgMask;
+        config.gshhgResolutionMode = gshhgResolutionMode;
         config.gshhgVectorPath = gshhgVectorPath;
         config.exportWaterMaskElevation = exportWaterMaskElevation;
         config.exportClampElevation = exportClampElevation;

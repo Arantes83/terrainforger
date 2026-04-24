@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
@@ -13,6 +15,10 @@ using Debug = UnityEngine.Debug;
 public static class TerrainGeoTiffExporter
 {
     private const string TempFolderName = "TerrainGeoTiffExport";
+    private const string GshhgVersion = "2.3.7";
+    private const string GshhgArchiveFileName = "gshhg-shp-2.3.7.zip";
+    private const string GshhgArchiveUrl = "https://ftp.soest.hawaii.edu/gshhg/gshhg-shp-2.3.7.zip";
+    private const string GshhgExtractedFolderName = "gshhg-shp-2.3.7";
 
     public static void ExportToRawTiles(TerrainTileImportConfig config)
     {
@@ -175,7 +181,7 @@ public static class TerrainGeoTiffExporter
 
         if (config.exportUseGshhgMask)
         {
-            ApplyGshhgMask(config, raster, tempRoot, tileLabel, tileBounds);
+            ApplyGshhgMask(config, raster, tempRoot, tileLabel, globalBounds, tileBounds);
         }
 
         var rawFileName = TerrainTileNaming.ResolvePattern(config.filePattern, row, col);
@@ -219,12 +225,14 @@ public static class TerrainGeoTiffExporter
         EnviFloatRaster raster,
         string tempRoot,
         string tileLabel,
+        TileBounds globalBounds,
         TileBounds tileBounds)
     {
+        var gshhgVectorPath = ResolveGshhgVectorPath(config, globalBounds);
         var tempMaskPath = Path.Combine(tempRoot, $"{tileLabel}_landmask.bin");
         RunGdalRasterize(
             config.qgisInstallFolder,
-            ResolvePath(config.gshhgVectorPath),
+            gshhgVectorPath,
             tempMaskPath,
             tileBounds.west,
             tileBounds.south,
@@ -242,6 +250,128 @@ public static class TerrainGeoTiffExporter
         }
 
         raster.RemapValuesOutsideLandMask(landMask.Values, config.exportWaterMaskElevation);
+    }
+
+    private static string ResolveGshhgVectorPath(TerrainTileImportConfig config, TileBounds globalBounds)
+    {
+        if (!string.IsNullOrWhiteSpace(config.gshhgVectorPath))
+        {
+            return ResolvePath(config.gshhgVectorPath);
+        }
+
+        var resolutionCode = SelectGshhgResolution(config.gshhgResolutionMode, globalBounds);
+        var datasetRoot = EnsureGshhgDatasetAvailable();
+        var shapefilePath = Path.Combine(
+            datasetRoot,
+            "GSHHS_shp",
+            resolutionCode.ToString(),
+            $"GSHHS_{resolutionCode}_L1.shp");
+
+        if (!File.Exists(shapefilePath))
+        {
+            throw new FileNotFoundException("Auto-downloaded GSHHG shapefile not found.", shapefilePath);
+        }
+
+        Debug.Log($"[TerrainForger Export] Using GSHHG resolution '{resolutionCode}' for the current region.");
+        return shapefilePath;
+    }
+
+    private static char SelectGshhgResolution(TerrainForgerGshhgResolutionMode resolutionMode, TileBounds bounds)
+    {
+        switch (resolutionMode)
+        {
+            case TerrainForgerGshhgResolutionMode.Full:
+                return 'f';
+            case TerrainForgerGshhgResolutionMode.High:
+                return 'h';
+            case TerrainForgerGshhgResolutionMode.Intermediate:
+                return 'i';
+            case TerrainForgerGshhgResolutionMode.Low:
+                return 'l';
+            case TerrainForgerGshhgResolutionMode.Crude:
+                return 'c';
+        }
+
+        var centerLatitude = (bounds.north + bounds.south) * 0.5d;
+        var widthKm = Math.Abs(LongitudeToMeters(bounds.east, bounds.west, centerLatitude)) / 1000d;
+        var heightKm = Math.Abs(LatitudeToMeters(bounds.north, bounds.south)) / 1000d;
+        var maxDimensionKm = Math.Max(widthKm, heightKm);
+
+        if (maxDimensionKm <= 125d)
+        {
+            return 'f';
+        }
+
+        if (maxDimensionKm <= 500d)
+        {
+            return 'h';
+        }
+
+        if (maxDimensionKm <= 2000d)
+        {
+            return 'i';
+        }
+
+        if (maxDimensionKm <= 6000d)
+        {
+            return 'l';
+        }
+
+        return 'c';
+    }
+
+    private static string EnsureGshhgDatasetAvailable()
+    {
+        var datasetRoot = Path.Combine(GetGshhgCacheRoot(), GshhgExtractedFolderName);
+        var markerFile = Path.Combine(datasetRoot, "GSHHS_shp", "i", "GSHHS_i_L1.shp");
+        if (File.Exists(markerFile))
+        {
+            return datasetRoot;
+        }
+
+        Directory.CreateDirectory(GetGshhgCacheRoot());
+        var archivePath = Path.Combine(GetGshhgCacheRoot(), GshhgArchiveFileName);
+
+        try
+        {
+            if (!File.Exists(archivePath))
+            {
+                EditorUtility.DisplayProgressBar(
+                    "TerrainForger GSHHG",
+                    $"Downloading GSHHG {GshhgVersion} shoreline dataset...",
+                    0.2f);
+                DownloadFileWithUserAgent(GshhgArchiveUrl, archivePath);
+            }
+
+            EditorUtility.DisplayProgressBar(
+                "TerrainForger GSHHG",
+                "Extracting GSHHG shoreline dataset...",
+                0.7f);
+
+            if (Directory.Exists(datasetRoot))
+            {
+                Directory.Delete(datasetRoot, true);
+            }
+
+            ZipFile.ExtractToDirectory(archivePath, GetGshhgCacheRoot());
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+        }
+
+        if (!File.Exists(markerFile))
+        {
+            throw new FileNotFoundException("GSHHG dataset was extracted but the expected shapefiles were not found.", markerFile);
+        }
+
+        return datasetRoot;
+    }
+
+    private static string GetGshhgCacheRoot()
+    {
+        var projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
+        return Path.Combine(projectRoot, "Library", "TerrainForger", "GSHHG");
     }
 
     private static void RunGdalWarp(
@@ -439,7 +569,9 @@ public static class TerrainGeoTiffExporter
         builder.AppendLine($"Export Satellite: {exportSatellite}");
         builder.AppendLine($"Clamp Enabled: {config.exportClampElevation}");
         builder.AppendLine($"Use GSHHG Land Mask: {config.exportUseGshhgMask}");
+        builder.AppendLine($"GSHHG Resolution Mode: {config.gshhgResolutionMode}");
         builder.AppendLine($"GSHHG Vector Path: {ResolveOptionalPath(config.gshhgVectorPath)}");
+        builder.AppendLine($"GSHHG Auto Download: {string.IsNullOrWhiteSpace(config.gshhgVectorPath)}");
         builder.AppendLine($"Water Mask Elevation: {config.exportWaterMaskElevation}");
         builder.AppendLine($"Min Elevation: {config.minElevation}");
         builder.AppendLine($"Max Elevation: {config.maxElevation}");
@@ -522,13 +654,8 @@ public static class TerrainGeoTiffExporter
             throw new InvalidOperationException("RAW output folder is required.");
         }
 
-        if (config.exportUseGshhgMask)
+        if (config.exportUseGshhgMask && !string.IsNullOrWhiteSpace(config.gshhgVectorPath))
         {
-            if (string.IsNullOrWhiteSpace(config.gshhgVectorPath))
-            {
-                throw new InvalidOperationException("GSHHG vector path is required when 'Use GSHHG Land Mask' is enabled.");
-            }
-
             var gshhgVectorPath = ResolvePath(config.gshhgVectorPath);
             if (!File.Exists(gshhgVectorPath))
             {
@@ -691,6 +818,15 @@ public static class TerrainGeoTiffExporter
             }
 
             return stdout;
+        }
+    }
+
+    private static void DownloadFileWithUserAgent(string url, string absoluteOutputPath)
+    {
+        using (var client = new WebClient())
+        {
+            client.Headers.Add(HttpRequestHeader.UserAgent, "TerrainForger/1.0");
+            client.DownloadFile(url, absoluteOutputPath);
         }
     }
 

@@ -86,7 +86,8 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
             settings.exportUseGshhgMask = EditorGUILayout.Toggle("Use GSHHG Land Mask", settings.exportUseGshhgMask);
             using (new EditorGUI.DisabledScope(!settings.exportUseGshhgMask))
             {
-                settings.gshhgVectorPath = EditorGUILayout.TextField("GSHHG Vector", settings.gshhgVectorPath);
+                settings.gshhgResolutionMode = (TerrainForgerGshhgResolutionMode)EditorGUILayout.EnumPopup("GSHHG Resolution", settings.gshhgResolutionMode);
+                settings.gshhgVectorPath = EditorGUILayout.TextField("GSHHG Vector Override", settings.gshhgVectorPath);
                 if (GUILayout.Button("Browse GSHHG Vector"))
                 {
                     BrowseVectorFile(ref settings.gshhgVectorPath, "Select GSHHG Land Vector");
@@ -95,7 +96,7 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
                 settings.exportWaterMaskElevation = EditorGUILayout.FloatField("Water Elevation", settings.exportWaterMaskElevation);
             }
             EditorGUILayout.HelpBox(
-                "Use a GSHHG land polygon vector to define the shoreline. Samples outside the land mask are exported at the configured water elevation, which avoids clipping the coastline from DEM altitude alone.",
+                "Use a GSHHG land polygon vector to define the shoreline. Leave the override path empty to auto-download the official GSHHG dataset. In Auto mode, TerrainForger picks the best resolution for the current region; you can also force Full, High, Intermediate, Low or Crude from the dropdown. Samples outside the land mask are exported at the configured water elevation, which avoids clipping the coastline from DEM altitude alone.",
                 MessageType.None);
         }
 
