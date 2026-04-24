@@ -6,6 +6,23 @@
 
 Unity Editor package para baixar dados GIS, exportar GeoTIFF para RAW/PNG e importar tiles de terreno.
 
+## Dependencias
+
+### Unity / UPM
+
+- `com.unity.modules.terrain`: necessario para criar e manipular `Terrain`, `TerrainData` e `TerrainLayer`
+- `com.unity.modules.imageconversion`: necessario para carregar previews raster com `Texture2D.LoadImage`
+
+### Requisitos externos
+
+- Unity `2020.3` ou superior
+- QGIS instalado localmente para os fluxos de GeoTIFF e preview raster que usam ferramentas GDAL
+- Chaves/configuracoes dos provedores quando voce usar downloads online:
+  - OpenTopography
+  - Mapbox
+  - Google Maps Platform
+  - Copernicus Data Space
+
 ## Instalacao
 
 ### Via Git URL
@@ -44,3 +61,4 @@ Se estiver desenvolvendo localmente, use `Add package from disk...` e selecione 
 
 - O package e editor-only.
 - Os dados gerados continuam sendo salvos no projeto consumidor, em caminhos como `Assets/Terrain` e `Assets/Generated`.
+- Sem QGIS/GDAL instalado, os recursos de importacao/exportacao GeoTIFF e alguns previews GIS nao funcionam.

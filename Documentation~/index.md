@@ -8,6 +8,17 @@ TerrainForger is a Unity Editor package focused on terrain workflows driven by G
 - Export GeoTIFF inputs to tiled RAW and PNG outputs
 - Import tiled terrain data into Unity Terrain assets
 
+## Dependencies
+
+- `com.unity.modules.terrain`
+- `com.unity.modules.imageconversion`
+
+## External Requirements
+
+- Unity 2020.3 or newer
+- Local QGIS installation for GDAL-based GeoTIFF workflows
+- Provider credentials when using online data sources
+
 ## Unity Menus
 
 - `Tools/TerrainForger/Get GIS Data`

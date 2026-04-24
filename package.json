@@ -11,6 +11,10 @@
     "editor",
     "tools"
   ],
+  "dependencies": {
+    "com.unity.modules.imageconversion": "1.0.0",
+    "com.unity.modules.terrain": "1.0.0"
+  },
   "author": {
     "name": "Arantes83"
   }
