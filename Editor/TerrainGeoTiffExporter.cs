@@ -20,6 +20,10 @@ public static class TerrainGeoTiffExporter
     private const string GshhgArchiveUrl = "https://ftp.soest.hawaii.edu/gshhg/gshhg-shp-2.3.7.zip";
     private const string GshhgExtractedFolderName = "gshhg-shp-2.3.7";
     private const string GshhgAssetCachePath = "Assets/Terrain/GSHHG";
+    private const string OsmLandPolygonsArchiveFileName = "land-polygons-split-4326.zip";
+    private const string OsmLandPolygonsArchiveUrl = "https://osmdata.openstreetmap.de/download/land-polygons-split-4326.zip";
+    private const string OsmLandPolygonsExtractedFolderName = "land-polygons-split-4326";
+    private const string OsmLandPolygonsAssetCachePath = "Assets/Terrain/OSMCoastline";
 
     public static void ExportToRawTiles(TerrainTileImportConfig config)
     {
@@ -182,7 +186,7 @@ public static class TerrainGeoTiffExporter
 
         if (config.exportUseGshhgMask)
         {
-            ApplyGshhgMask(config, raster, tempRoot, tileLabel, globalBounds, tileBounds);
+            ApplyCoastlineMask(config, raster, tempRoot, tileLabel, globalBounds, tileBounds);
         }
 
         var rawFileName = TerrainTileNaming.ResolvePattern(config.filePattern, row, col);
@@ -221,7 +225,7 @@ public static class TerrainGeoTiffExporter
             format: "PNG");
     }
 
-    private static void ApplyGshhgMask(
+    private static void ApplyCoastlineMask(
         TerrainTileImportConfig config,
         EnviFloatRaster raster,
         string tempRoot,
@@ -229,11 +233,11 @@ public static class TerrainGeoTiffExporter
         TileBounds globalBounds,
         TileBounds tileBounds)
     {
-        var gshhgVectorPath = ResolveGshhgVectorPath(config, globalBounds);
+        var vectorPath = ResolveCoastlineVectorPath(config, globalBounds);
         var tempMaskPath = Path.Combine(tempRoot, $"{tileLabel}_landmask.bin");
         RunGdalRasterize(
             config.qgisInstallFolder,
-            gshhgVectorPath,
+            vectorPath,
             tempMaskPath,
             tileBounds.west,
             tileBounds.south,
@@ -247,10 +251,21 @@ public static class TerrainGeoTiffExporter
         if (landMask.Width != raster.Width || landMask.Height != raster.Height)
         {
             throw new InvalidOperationException(
-                $"Unexpected GSHHG mask size for tile {tileLabel}. Expected {raster.Width}x{raster.Height}, got {landMask.Width}x{landMask.Height}.");
+                $"Unexpected coastline mask size for tile {tileLabel}. Expected {raster.Width}x{raster.Height}, got {landMask.Width}x{landMask.Height}.");
         }
 
         raster.RemapValuesOutsideLandMask(landMask.Values, config.exportWaterMaskElevation);
+    }
+
+    private static string ResolveCoastlineVectorPath(TerrainTileImportConfig config, TileBounds globalBounds)
+    {
+        switch (config.coastlineDataSource)
+        {
+            case TerrainForgerCoastlineDataSource.OpenStreetMap:
+                return ResolveOsmLandVectorPath(config);
+            default:
+                return ResolveGshhgVectorPath(config, globalBounds);
+        }
     }
 
     private static string ResolveGshhgVectorPath(TerrainTileImportConfig config, TileBounds globalBounds)
@@ -274,6 +289,24 @@ public static class TerrainGeoTiffExporter
         }
 
         Debug.Log($"[TerrainForger Export] Using GSHHG resolution '{resolutionCode}' for the current region.");
+        return shapefilePath;
+    }
+
+    private static string ResolveOsmLandVectorPath(TerrainTileImportConfig config)
+    {
+        if (!string.IsNullOrWhiteSpace(config.osmLandVectorPath))
+        {
+            return ResolvePath(config.osmLandVectorPath);
+        }
+
+        var datasetRoot = EnsureOsmLandDatasetAvailable();
+        var shapefilePath = Path.Combine(datasetRoot, "land_polygons.shp");
+        if (!File.Exists(shapefilePath))
+        {
+            throw new FileNotFoundException("Auto-downloaded OSM land polygon shapefile not found.", shapefilePath);
+        }
+
+        Debug.Log("[TerrainForger Export] Using auto-downloaded OpenStreetMap land polygons for the current region.");
         return shapefilePath;
     }
 
@@ -373,9 +406,66 @@ public static class TerrainGeoTiffExporter
         return extractedDatasetRoot;
     }
 
+    private static string EnsureOsmLandDatasetAvailable()
+    {
+        var cacheRoot = GetOsmLandCacheRoot();
+        var existingDatasetRoot = FindOsmLandDatasetRoot(cacheRoot);
+        if (!string.IsNullOrEmpty(existingDatasetRoot))
+        {
+            return existingDatasetRoot;
+        }
+
+        var datasetRoot = Path.Combine(cacheRoot, OsmLandPolygonsExtractedFolderName);
+        Directory.CreateDirectory(cacheRoot);
+        var archivePath = Path.Combine(cacheRoot, OsmLandPolygonsArchiveFileName);
+
+        try
+        {
+            if (!File.Exists(archivePath))
+            {
+                EditorUtility.DisplayProgressBar(
+                    "TerrainForger OSM Coastline",
+                    "Downloading OpenStreetMap land polygons...",
+                    0.2f);
+                DownloadFileWithUserAgent(OsmLandPolygonsArchiveUrl, archivePath);
+            }
+
+            EditorUtility.DisplayProgressBar(
+                "TerrainForger OSM Coastline",
+                "Extracting OpenStreetMap land polygons...",
+                0.7f);
+
+            if (Directory.Exists(datasetRoot))
+            {
+                Directory.Delete(datasetRoot, true);
+            }
+
+            ExtractZipArchive(archivePath, cacheRoot);
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+        }
+
+        var extractedDatasetRoot = FindOsmLandDatasetRoot(cacheRoot);
+        if (string.IsNullOrEmpty(extractedDatasetRoot))
+        {
+            throw new FileNotFoundException(
+                "OpenStreetMap land polygons were extracted but the expected shapefiles were not found.",
+                Path.Combine(cacheRoot, "land_polygons.shp"));
+        }
+
+        return extractedDatasetRoot;
+    }
+
     private static string GetGshhgCacheRoot()
     {
         return ResolvePath(GshhgAssetCachePath);
+    }
+
+    private static string GetOsmLandCacheRoot()
+    {
+        return ResolvePath(OsmLandPolygonsAssetCachePath);
     }
 
     private static string FindGshhgDatasetRoot(string cacheRoot)
@@ -388,6 +478,24 @@ public static class TerrainGeoTiffExporter
 
         var nestedRoot = Path.Combine(cacheRoot, GshhgExtractedFolderName);
         var nestedMarker = Path.Combine(nestedRoot, "GSHHS_shp", "i", "GSHHS_i_L1.shp");
+        if (File.Exists(nestedMarker))
+        {
+            return nestedRoot;
+        }
+
+        return string.Empty;
+    }
+
+    private static string FindOsmLandDatasetRoot(string cacheRoot)
+    {
+        var directMarker = Path.Combine(cacheRoot, "land_polygons.shp");
+        if (File.Exists(directMarker))
+        {
+            return cacheRoot;
+        }
+
+        var nestedRoot = Path.Combine(cacheRoot, OsmLandPolygonsExtractedFolderName);
+        var nestedMarker = Path.Combine(nestedRoot, "land_polygons.shp");
         if (File.Exists(nestedMarker))
         {
             return nestedRoot;
