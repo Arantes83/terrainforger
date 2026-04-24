@@ -262,7 +262,7 @@ public static class TerrainGeoTiffExporter
         switch (config.coastlineDataSource)
         {
             case TerrainForgerCoastlineDataSource.OpenStreetMap:
-                return ResolveOsmLandVectorPath(config);
+                return ResolveOsmLandVectorPath();
             default:
                 return ResolveGshhgVectorPath(config, globalBounds);
         }
@@ -270,11 +270,6 @@ public static class TerrainGeoTiffExporter
 
     private static string ResolveGshhgVectorPath(TerrainTileImportConfig config, TileBounds globalBounds)
     {
-        if (!string.IsNullOrWhiteSpace(config.gshhgVectorPath))
-        {
-            return ResolvePath(config.gshhgVectorPath);
-        }
-
         var resolutionCode = SelectGshhgResolution(config.gshhgResolutionMode, globalBounds);
         var datasetRoot = EnsureGshhgDatasetAvailable();
         var shapefilePath = Path.Combine(
@@ -292,13 +287,8 @@ public static class TerrainGeoTiffExporter
         return shapefilePath;
     }
 
-    private static string ResolveOsmLandVectorPath(TerrainTileImportConfig config)
+    private static string ResolveOsmLandVectorPath()
     {
-        if (!string.IsNullOrWhiteSpace(config.osmLandVectorPath))
-        {
-            return ResolvePath(config.osmLandVectorPath);
-        }
-
         var datasetRoot = EnsureOsmLandDatasetAvailable();
         var shapefilePath = Path.Combine(datasetRoot, "land_polygons.shp");
         if (!File.Exists(shapefilePath))
@@ -691,6 +681,11 @@ public static class TerrainGeoTiffExporter
         return value;
     }
 
+    private static string GetCoastlineSourceLabel(TerrainForgerCoastlineDataSource source)
+    {
+        return source == TerrainForgerCoastlineDataSource.OpenStreetMap ? "OpenStreetMap" : "GSHHG";
+    }
+
     private static void ApplyTileSpatialMetadata(
         TerrainTileElevationMetadata metadata,
         TileBounds globalBounds,
@@ -737,11 +732,23 @@ public static class TerrainGeoTiffExporter
         builder.AppendLine($"File Pattern: {config.filePattern}");
         builder.AppendLine($"Export DEM: {exportDem}");
         builder.AppendLine($"Export Satellite: {exportSatellite}");
-        builder.AppendLine($"Clamp Enabled: {config.exportClampElevation}");
-        builder.AppendLine($"Use GSHHG Land Mask: {config.exportUseGshhgMask}");
-        builder.AppendLine($"GSHHG Resolution Mode: {config.gshhgResolutionMode}");
-        builder.AppendLine($"GSHHG Vector Path: {ResolveOptionalPath(config.gshhgVectorPath)}");
-        builder.AppendLine($"GSHHG Auto Download: {string.IsNullOrWhiteSpace(config.gshhgVectorPath)}");
+        builder.AppendLine($"Use Coastline Land Mask: {config.exportUseGshhgMask}");
+        if (config.exportUseGshhgMask)
+        {
+            builder.AppendLine($"Coastline Data Source: {GetCoastlineSourceLabel(config.coastlineDataSource)}");
+            builder.AppendLine("Auto Download Coastline Dataset: True");
+
+            if (config.coastlineDataSource == TerrainForgerCoastlineDataSource.OpenStreetMap)
+            {
+                builder.AppendLine($"OSM Land Dataset Cache: {ResolvePath(OsmLandPolygonsAssetCachePath)}");
+            }
+            else
+            {
+                builder.AppendLine($"GSHHG Resolution Mode: {config.gshhgResolutionMode}");
+                builder.AppendLine($"GSHHG Dataset Cache: {ResolvePath(GshhgAssetCachePath)}");
+            }
+        }
+
         builder.AppendLine($"Water Mask Elevation: {config.exportWaterMaskElevation}");
         builder.AppendLine($"Min Elevation: {config.minElevation}");
         builder.AppendLine($"Max Elevation: {config.maxElevation}");
@@ -824,13 +831,9 @@ public static class TerrainGeoTiffExporter
             throw new InvalidOperationException("RAW output folder is required.");
         }
 
-        if (config.exportUseGshhgMask && !string.IsNullOrWhiteSpace(config.gshhgVectorPath))
+        if (!config.exportUseGshhgMask)
         {
-            var gshhgVectorPath = ResolvePath(config.gshhgVectorPath);
-            if (!File.Exists(gshhgVectorPath))
-            {
-                throw new FileNotFoundException("GSHHG vector file not found.", gshhgVectorPath);
-            }
+            return;
         }
 
     }

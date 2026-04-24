@@ -82,22 +82,22 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
             EditorGUILayout.LabelField("Coastline Mask", EditorStyles.boldLabel);
-            settings.exportClampElevation = EditorGUILayout.Toggle("Clamp Elevation", settings.exportClampElevation);
-            settings.exportUseGshhgMask = EditorGUILayout.Toggle("Use GSHHG Land Mask", settings.exportUseGshhgMask);
+            settings.exportUseGshhgMask = EditorGUILayout.Toggle("Use Coastline Land Mask", settings.exportUseGshhgMask);
             using (new EditorGUI.DisabledScope(!settings.exportUseGshhgMask))
             {
-                settings.gshhgResolutionMode = (TerrainForgerGshhgResolutionMode)EditorGUILayout.EnumPopup("GSHHG Resolution", settings.gshhgResolutionMode);
-                settings.gshhgVectorPath = EditorGUILayout.TextField("GSHHG Vector Override", settings.gshhgVectorPath);
-                if (GUILayout.Button("Browse GSHHG Vector"))
+                settings.coastlineDataSource = DrawCoastlineSourcePopup("Coastline Source", settings.coastlineDataSource);
+
+                if (settings.coastlineDataSource == TerrainForgerCoastlineDataSource.Gshhg)
                 {
-                    BrowseVectorFile(ref settings.gshhgVectorPath, "Select GSHHG Land Vector");
+                    settings.gshhgResolutionMode = (TerrainForgerGshhgResolutionMode)EditorGUILayout.EnumPopup("GSHHG Resolution", settings.gshhgResolutionMode);
                 }
 
                 settings.exportWaterMaskElevation = EditorGUILayout.FloatField("Water Elevation", settings.exportWaterMaskElevation);
             }
-            EditorGUILayout.HelpBox(
-                "Use a GSHHG land polygon vector to define the shoreline. Leave the override path empty to auto-download the official GSHHG dataset. In Auto mode, TerrainForger picks the best resolution for the current region; you can also force Full, High, Intermediate, Low or Crude from the dropdown. Samples outside the land mask are exported at the configured water elevation, which avoids clipping the coastline from DEM altitude alone.",
-                MessageType.None);
+            var coastlineHelp = settings.coastlineDataSource == TerrainForgerCoastlineDataSource.Gshhg
+                ? "Use GSHHG land polygons to define the shoreline. TerrainForger auto-downloads the official dataset and, in Auto mode, picks the best resolution for the current region. Samples outside the land mask are exported at the configured water elevation, which avoids clipping the coastline from DEM altitude alone."
+                : "Use OpenStreetMap-derived land polygons to define the shoreline. TerrainForger auto-downloads the processed OSM land polygons in WGS84. This option can better match edited or recent coastlines, while still masking the DEM by land polygons instead of clipping by elevation.";
+            EditorGUILayout.HelpBox(coastlineHelp, MessageType.None);
         }
 
         DrawPreviewSection(settings);
@@ -270,17 +270,12 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
         }
     }
 
-    private static void BrowseVectorFile(ref string targetPath, string title)
+    private static TerrainForgerCoastlineDataSource DrawCoastlineSourcePopup(string label, TerrainForgerCoastlineDataSource currentValue)
     {
-        var startFolder = string.IsNullOrWhiteSpace(targetPath)
-            ? TerrainForgeWindowUtility.ResolveFolderPath("Assets")
-            : Path.GetDirectoryName(TerrainForgeWindowUtility.ResolveFolderPath(targetPath));
-
-        var selected = EditorUtility.OpenFilePanel(title, startFolder, string.Empty);
-        if (!string.IsNullOrEmpty(selected))
-        {
-            targetPath = selected;
-        }
+        var options = new[] { "GSHHG", "OpenStreetMap" };
+        var selectedIndex = currentValue == TerrainForgerCoastlineDataSource.OpenStreetMap ? 1 : 0;
+        selectedIndex = EditorGUILayout.Popup(label, selectedIndex, options);
+        return selectedIndex == 1 ? TerrainForgerCoastlineDataSource.OpenStreetMap : TerrainForgerCoastlineDataSource.Gshhg;
     }
 
     private void DrawTileGridOverlay(Rect rect, int rows, int cols)

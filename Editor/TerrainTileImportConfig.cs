@@ -52,16 +52,14 @@ public class TerrainTileImportConfig : ScriptableObject
     public int satelliteTileResolution = 1024;
     [Tooltip("Path to the QGIS installation folder. Example: C:/Program Files/QGIS 3.36.1")]
     public string qgisInstallFolder = string.Empty;
-    [Tooltip("When enabled, TerrainForger uses a GSHHG land polygon vector to decide which samples remain land during DEM export.")]
+    [Tooltip("When enabled, TerrainForger uses a coastline land polygon vector to decide which samples remain land during DEM export.")]
     public bool exportUseGshhgMask;
+    [Tooltip("Select which coastline dataset TerrainForger should use when masking the DEM shoreline.")]
+    public TerrainForgerCoastlineDataSource coastlineDataSource = TerrainForgerCoastlineDataSource.Gshhg;
     [Tooltip("Resolution used when selecting the GSHHG coastline dataset. Auto chooses based on the project region extent.")]
     public TerrainForgerGshhgResolutionMode gshhgResolutionMode = TerrainForgerGshhgResolutionMode.Auto;
-    [Tooltip("Path to a GSHHG land polygon vector file, usually a .shp extracted from the official dataset.")]
-    public string gshhgVectorPath = string.Empty;
-    [Tooltip("Elevation assigned to DEM samples outside the GSHHG land mask.")]
+    [Tooltip("Elevation assigned to DEM samples outside the selected coastline land mask.")]
     public float exportWaterMaskElevation = -10f;
-    [Tooltip("When enabled, values are clamped to the min/max elevation range before conversion.")]
-    public bool exportClampElevation = true;
     [Tooltip("Writes a text manifest with the export settings next to the RAW tiles.")]
     public bool writeExportManifest = true;
 

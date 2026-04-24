@@ -21,6 +21,12 @@ public enum TerrainForgerGshhgResolutionMode
     Crude
 }
 
+public enum TerrainForgerCoastlineDataSource
+{
+    Gshhg,
+    OpenStreetMap
+}
+
 public struct TerrainForgerSatelliteDownloadPlan
 {
     public bool isValid;

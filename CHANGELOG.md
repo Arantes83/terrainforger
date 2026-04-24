@@ -3,6 +3,10 @@
 ## [Unreleased] - 2026-04-24
 
 - Moved the auto-downloaded GSHHG cache from `Library/TerrainForger/GSHHG` to `Assets/Terrain/GSHHG` so the shoreline dataset stays visible inside the Unity project.
+- Added an OpenStreetMap coastline alternative using processed OSM land polygons in WGS84 as a second shoreline mask source.
+- Added a `Coastline Source` dropdown so DEM export can switch between `GSHHG` and `OpenStreetMap`.
+- Simplified the coastline mask UI to always use auto-downloaded datasets, removing manual vector overrides and browse actions for both `GSHHG` and `OpenStreetMap`.
+- Removed the unused `Clamp Elevation` option from the export workflow.
 - Added a dedicated top-level `TerrainForger` menu in the Unity editor instead of nesting the tools under the shared `Tools` menu.
 - Fixed GSHHG ZIP extraction to support the actual flat archive layout used by the official dataset.
 - Reduced shoreline mask bias by rasterizing the GSHHG land mask without the previous all-touched expansion behavior.

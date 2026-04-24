@@ -55,10 +55,9 @@ public class TerrainForgeWorkflowSettings : ScriptableSingleton<TerrainForgeWork
     public string satelliteOutputFolder = "Assets/Terrain/PNG";
     public int satelliteTileResolution = 1024;
     public bool exportUseGshhgMask;
+    public TerrainForgerCoastlineDataSource coastlineDataSource = TerrainForgerCoastlineDataSource.Gshhg;
     public TerrainForgerGshhgResolutionMode gshhgResolutionMode = TerrainForgerGshhgResolutionMode.Auto;
-    public string gshhgVectorPath = string.Empty;
     public float exportWaterMaskElevation = -10f;
-    public bool exportClampElevation = true;
     public bool writeExportManifest = true;
 
     [Header("GeoTIFF Bounds")]
@@ -111,10 +110,9 @@ public class TerrainForgeWorkflowSettings : ScriptableSingleton<TerrainForgeWork
         satelliteOutputFolder = config.satelliteOutputFolder;
         satelliteTileResolution = config.satelliteTileResolution;
         exportUseGshhgMask = config.exportUseGshhgMask;
+        coastlineDataSource = config.coastlineDataSource;
         gshhgResolutionMode = config.gshhgResolutionMode;
-        gshhgVectorPath = config.gshhgVectorPath;
         exportWaterMaskElevation = config.exportWaterMaskElevation;
-        exportClampElevation = config.exportClampElevation;
         writeExportManifest = config.writeExportManifest;
         northBound = config.northBound;
         southBound = config.southBound;
@@ -160,10 +158,9 @@ public class TerrainForgeWorkflowSettings : ScriptableSingleton<TerrainForgeWork
         config.satelliteTileResolution = satelliteTileResolution;
         config.qgisInstallFolder = TerrainDataServiceSettings.instance.QgisInstallFolder;
         config.exportUseGshhgMask = exportUseGshhgMask;
+        config.coastlineDataSource = coastlineDataSource;
         config.gshhgResolutionMode = gshhgResolutionMode;
-        config.gshhgVectorPath = gshhgVectorPath;
         config.exportWaterMaskElevation = exportWaterMaskElevation;
-        config.exportClampElevation = exportClampElevation;
         config.writeExportManifest = writeExportManifest;
         config.northBound = northBound;
         config.southBound = southBound;
