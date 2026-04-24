@@ -4,77 +4,241 @@
   <img src="Documentation~/images/TerrainForger.png" alt="TerrainForger" width="420" />
 </p>
 
-Unity Editor package para baixar dados GIS, exportar GeoTIFF para RAW/PNG e importar tiles de terreno.
+TerrainForger is a Unity Editor addon designed for importing, processing, and generating large-scale terrains from real-world geospatial data sources such as DEM GeoTIFFs and satellite imagery.
 
-## Dependencias
+Its primary goal is to provide a production-ready workflow for converting GIS elevation data and satellite imagery into optimized Unity Terrain workflows.
 
-### Unity / UPM
+TerrainForger standardizes the GIS → Unity terrain pipeline, reducing manual work, import errors, and inconsistent terrain generation.
 
-- `com.unity.modules.terrain`: necessario para criar e manipular `Terrain`, `TerrainData` e `TerrainLayer`
-- `com.unity.modules.imageconversion`: necessario para carregar previews raster com `Texture2D.LoadImage`
+---
 
-### Requisitos externos
+# Official Supported Unity Version
 
-- Unity `2020.3` ou superior
-- QGIS instalado localmente para os fluxos de GeoTIFF e preview raster que usam ferramentas GDAL
-- Chaves/configuracoes dos provedores quando voce usar downloads online:
-  - OpenTopography
-  - Mapbox
-  - Google Maps Platform
-
-## Seguranca das credenciais
-
-- As credenciais do addon ficam salvas localmente em `UserSettings/TerrainDataServiceSettings.asset` do projeto Unity consumidor.
-- Esse arquivo fica fora do package distribuido e o repositorio ignora `UserSettings/` no `.gitignore`.
-- O package nao inclui API keys hardcoded: os campos de credenciais no codigo iniciam vazios e os valores sao lidos em tempo de execucao das settings locais do projeto.
-
-## Instalacao
-
-### Via Git URL
-
-No `Packages/manifest.json` do projeto Unity:
-
-```json
-{
-  "dependencies": {
-    "com.arantes83.terrainforger": "https://github.com/Arantes83/terrainforger.git"
-  }
-}
+```text
+Unity 2020.3.22f1 Personal
 ```
 
-### Via Package Manager
+This is the officially supported version for production use.
 
-Abra `Window > Package Manager`, escolha `Add package from git URL...` e informe a URL do repositorio.
+Other Unity versions may work, but they are not officially supported or guaranteed to behave identically due to API differences in Unity Editor tools, Terrain systems, and asset import pipelines.
 
-### Via pasta local
+For maximum stability, use the supported version whenever possible.
 
-Se estiver desenvolvendo localmente, use `Add package from disk...` e selecione o `package.json` deste repositorio.
+---
 
-## Estrutura do package
+# Core Features
 
-- `package.json`: metadados do UPM package
-- `Editor`: scripts editor-only do addon
-- `Documentation~`: documentacao do package
+## GeoTIFF2Raw Export
 
-## Menus criados no Unity
+Convert DEM GeoTIFF files into Unity-compatible RAW heightmaps with validation and synchronized DEM + satellite workflows.
 
-- `TerrainForger/Get GIS Data`
-- `TerrainForger/Geotiff2Raw Export`
-- `TerrainForger/Import Tiles`
+Includes:
 
-## Observacoes
+* DEM folder validation
+* Satellite GeoTIFF integration
+* RAW export pipeline
+* Automatic filename detection
+* Height normalization
+* Terrain size configuration
 
-- O package e editor-only.
-- Os dados gerados continuam sendo salvos no projeto consumidor, em caminhos como `Assets/Terrain` e `Assets/Generated`.
-- Sem QGIS/GDAL instalado, os recursos de importacao/exportacao GeoTIFF e alguns previews GIS nao funcionam.
+---
 
-## Caracteristicas atuais do addon
+## Terrain Tile Importer
 
-- `TerrainForger/TerrainForger`: janela raiz do addon, com acesso centralizado às ferramentas e às `Service Settings`.
-- `TerrainForger/Service Settings`: configuração global de OpenTopography, Mapbox, Google Maps Platform e pasta local do QGIS/GDAL.
-- Na primeira carga do addon no editor, TerrainForger abre a janela raiz e as configurações de serviço quando as credenciais/caminhos essenciais ainda não estão configurados.
-- `TerrainForger/Get GIS Data`: carrega um source file local, refaz os bounds a partir do próprio raster e usa esses limites exatos para baixar DEM e SAT. Quando um source file válido está ativo, os `Map Bounds` ficam bloqueados para evitar inconsistência manual.
-- `TerrainForger/Geotiff2Raw Export`: exporta tiles RAW 16-bit de DEM e tiles PNG de satélite usando a mesma grade, nomes e área geográfica.
-- `TerrainForger/Import Tiles`: importa RAWs como `TerrainData` e aplica PNGs de satélite como `TerrainLayer` mantendo a resolução real do PNG no importador da Unity, evitando o downscale padrão de 4096 para 2048.
-- As janelas de ferramenta exibem tooltips nos controles principais, possuem uma área visual de log do fluxo executado e mantêm `Save Tool Settings` / `Reset Tool Settings` no rodapé.
-- Os previews de Source, DEM e SAT devem representar a mesma área quando o fluxo é conduzido a partir de source file, pois o source passa a ser a autoridade dos bounds.
+Import RAW files and generate Unity Terrain tiles with proper terrain stitching and material assignment.
+
+Includes:
+
+* Tile grid generation
+* Terrain stitching
+* Satellite texture assignment
+* Material setup
+* Large world support
+
+---
+
+## Terrain Data Services
+
+Simplified and secure terrain data service configuration for controlled production workflows.
+
+Includes:
+
+* safer credential handling
+* production-ready configuration
+* validation workflows
+
+---
+
+# Recommended Workflow
+
+Official supported pipeline:
+
+```text
+Prepare GIS Data
+→ Export GeoTIFF to RAW
+→ Import Terrain Tiles
+→ Apply Satellite Textures
+→ Validate Terrain Scale
+→ Final Optimization
+```
+
+Changing the order of this workflow may produce invalid terrains.
+
+---
+
+# Installation
+
+## 1. Clone or Download the Repository
+
+```bash
+git clone https://github.com/Arantes83/terrainforger.git
+```
+
+---
+
+## 2. Copy Into Your Unity Project
+
+Recommended location:
+
+```text
+Assets/Editor/TerrainForger
+```
+
+---
+
+## 3. Open Unity
+
+Open the project using:
+
+```text
+Unity 2020.3.22f1 Personal
+```
+
+Wait for script compilation to finish.
+
+Do not interrupt the first compilation.
+
+---
+
+## 4. Access the Tool
+
+After compilation, access the addon through:
+
+```text
+Tools > TerrainForger
+```
+
+If the menu does not appear, check the Troubleshooting section in the full documentation.
+
+---
+
+# Full Documentation
+
+Complete usage documentation is available here:
+
+[User Manual](Documentation~/UserManual.md)
+
+All users are strongly recommended to read the manual before using the addon.
+
+---
+
+# Automatically Generated Folder Structure
+
+TerrainForger automatically creates the required working folder structure inside `Assets/` during the workflow.
+
+Manual folder creation is not required.
+
+Official generated structure:
+
+```text
+Assets/
+├── Generated/
+│   └── TerrainTiles/
+│       └── Generated Unity terrain tile assets
+│
+└── Terrain/
+    ├── GeoTIFF/
+    │   └── Source GeoTIFF files used as geographic reference/input
+    │
+    ├── OSMCoastline/
+    │   └── OpenStreetMap coastline/vector support data
+    │
+    ├── PNG/
+    │   └── Generated satellite PNG tiles
+    │
+    ├── Raw/
+    │   └── Generated RAW 16-bit heightmap tiles
+    │
+    └── SAT/
+        └── Source or downloaded satellite raster data
+```
+
+Folder purpose:
+
+* `GeoTIFF/` stores source geographic raster data
+* `SAT/` stores satellite raster source files
+* `Raw/` stores exported RAW heightmaps for Unity Terrain
+* `PNG/` stores generated satellite image tiles
+* `OSMCoastline/` stores OpenStreetMap coastline support data
+* `Generated/TerrainTiles/` stores the final generated Unity terrain tiles
+
+Unity will also generate `.meta` files automatically for every folder and asset.
+These files must remain versioned when committed.
+
+This structure represents the real operational workflow of the addon and should be treated as the official supported pipeline.
+
+Avoid manually changing this structure unless there is a specific production requirement.
+
+---
+
+# Performance Notes
+
+For large terrain projects:
+
+Recommended:
+
+* SSD storage
+* 32 GB RAM or more
+* Dedicated GPU
+* Tiled terrain workflows instead of massive single terrains
+
+Avoid extremely large single terrain imports whenever possible.
+
+Large terrains should be split intentionally.
+
+---
+
+# Best Practices
+
+* Never mix source GIS files with generated Unity assets
+* Always backup original DEM files
+* Keep DEM and satellite datasets synchronized
+* Validate coordinate systems before importing
+* Use consistent tile naming conventions
+* Keep generated RAW files separated from source files
+
+This prevents data corruption and long-term maintenance problems.
+
+---
+
+# Changelog
+
+Project updates and feature changes are documented in:
+
+[CHANGELOG.md](CHANGELOG.md)
+
+---
+
+# License
+
+Please refer to the repository license information for usage permissions and restrictions.
+
+---
+
+# Final Note
+
+TerrainForger is designed for production environments where terrain correctness, reproducibility, and workflow stability matter.
+
+This is not intended to be a quick import utility.
+
+It is a controlled GIS → Unity terrain pipeline.
