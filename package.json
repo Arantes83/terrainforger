@@ -4,6 +4,9 @@
   "displayName": "TerrainForger",
   "description": "Unity Editor package for GIS data download, GeoTIFF export, and terrain tile import workflows.",
   "unity": "2020.3",
+  "documentationUrl": "https://github.com/Arantes83/terrainforger/blob/main/README.md",
+  "changelogUrl": "https://github.com/Arantes83/terrainforger/blob/main/CHANGELOG.md",
+  "license": "MIT",
   "keywords": [
     "terrain",
     "gis",
