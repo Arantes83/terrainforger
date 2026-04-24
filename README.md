@@ -11,7 +11,7 @@ No `Packages/manifest.json` do projeto Unity:
 ```json
 {
   "dependencies": {
-    "com.beatrizbarbosa.terrainforger": "https://github.com/beatrizbarbosa-stack/terrainforger.git"
+    "com.arantes83.terrainforger": "https://github.com/Arantes83/terrainforger.git"
   }
 }
 ```

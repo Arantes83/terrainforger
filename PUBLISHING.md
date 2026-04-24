@@ -37,5 +37,5 @@ git push -u origin main
 Depois de publicar, o package pode ser instalado no Unity Package Manager por Git URL:
 
 ```text
-https://github.com/beatrizbarbosa-stack/terrainforger.git
+https://github.com/Arantes83/terrainforger.git
 ```

@@ -1,5 +1,5 @@
 {
-  "name": "com.beatrizbarbosa.terrainforger",
+  "name": "com.arantes83.terrainforger",
   "version": "0.1.0",
   "displayName": "TerrainForger",
   "description": "Unity Editor package for GIS data download, GeoTIFF export, and terrain tile import workflows.",
@@ -12,6 +12,6 @@
     "tools"
   ],
   "author": {
-    "name": "beatrizbarbosa-stack"
+    "name": "Arantes83"
   }
 }
