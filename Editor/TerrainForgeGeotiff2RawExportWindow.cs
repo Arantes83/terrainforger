@@ -81,15 +81,21 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
 
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
-            EditorGUILayout.LabelField("Elevation Filters", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Coastline Mask", EditorStyles.boldLabel);
             settings.exportClampElevation = EditorGUILayout.Toggle("Clamp Elevation", settings.exportClampElevation);
-            settings.exportOnlyAboveSeaLevel = EditorGUILayout.Toggle("Remap Below Sea Level", settings.exportOnlyAboveSeaLevel);
-            using (new EditorGUI.DisabledScope(!settings.exportOnlyAboveSeaLevel))
+            settings.exportUseGshhgMask = EditorGUILayout.Toggle("Use GSHHG Land Mask", settings.exportUseGshhgMask);
+            using (new EditorGUI.DisabledScope(!settings.exportUseGshhgMask))
             {
-                settings.exportSeaFloorClampElevation = EditorGUILayout.FloatField("Below Sea Level To", settings.exportSeaFloorClampElevation);
+                settings.gshhgVectorPath = EditorGUILayout.TextField("GSHHG Vector", settings.gshhgVectorPath);
+                if (GUILayout.Button("Browse GSHHG Vector"))
+                {
+                    BrowseVectorFile(ref settings.gshhgVectorPath, "Select GSHHG Land Vector");
+                }
+
+                settings.exportWaterMaskElevation = EditorGUILayout.FloatField("Water Elevation", settings.exportWaterMaskElevation);
             }
             EditorGUILayout.HelpBox(
-                "Clamp keeps exported heights inside the detected DEM elevation range. Remap Below Sea Level sends any elevation at or below 0 m to the configured floor before the RAW conversion.",
+                "Use a GSHHG land polygon vector to define the shoreline. Samples outside the land mask are exported at the configured water elevation, which avoids clipping the coastline from DEM altitude alone.",
                 MessageType.None);
         }
 
@@ -251,6 +257,19 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
     }
 
     private static void BrowseGeoTiff(ref string targetPath, string title)
+    {
+        var startFolder = string.IsNullOrWhiteSpace(targetPath)
+            ? TerrainForgeWindowUtility.ResolveFolderPath("Assets")
+            : Path.GetDirectoryName(TerrainForgeWindowUtility.ResolveFolderPath(targetPath));
+
+        var selected = EditorUtility.OpenFilePanel(title, startFolder, string.Empty);
+        if (!string.IsNullOrEmpty(selected))
+        {
+            targetPath = selected;
+        }
+    }
+
+    private static void BrowseVectorFile(ref string targetPath, string title)
     {
         var startFolder = string.IsNullOrWhiteSpace(targetPath)
             ? TerrainForgeWindowUtility.ResolveFolderPath("Assets")

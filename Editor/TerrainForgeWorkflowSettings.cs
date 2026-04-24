@@ -54,8 +54,9 @@ public class TerrainForgeWorkflowSettings : ScriptableSingleton<TerrainForgeWork
     public string satelliteGeoTiffPath = string.Empty;
     public string satelliteOutputFolder = "Assets/Terrain/PNG";
     public int satelliteTileResolution = 1024;
-    public bool exportOnlyAboveSeaLevel;
-    public float exportSeaFloorClampElevation = -10f;
+    public bool exportUseGshhgMask;
+    public string gshhgVectorPath = string.Empty;
+    public float exportWaterMaskElevation = -10f;
     public bool exportClampElevation = true;
     public bool writeExportManifest = true;
 
@@ -108,8 +109,9 @@ public class TerrainForgeWorkflowSettings : ScriptableSingleton<TerrainForgeWork
         satelliteGeoTiffPath = config.satelliteGeoTiffPath;
         satelliteOutputFolder = config.satelliteOutputFolder;
         satelliteTileResolution = config.satelliteTileResolution;
-        exportOnlyAboveSeaLevel = config.exportOnlyAboveSeaLevel;
-        exportSeaFloorClampElevation = config.exportSeaFloorClampElevation;
+        exportUseGshhgMask = config.exportUseGshhgMask;
+        gshhgVectorPath = config.gshhgVectorPath;
+        exportWaterMaskElevation = config.exportWaterMaskElevation;
         exportClampElevation = config.exportClampElevation;
         writeExportManifest = config.writeExportManifest;
         northBound = config.northBound;
@@ -155,8 +157,9 @@ public class TerrainForgeWorkflowSettings : ScriptableSingleton<TerrainForgeWork
         config.satelliteOutputFolder = satelliteOutputFolder;
         config.satelliteTileResolution = satelliteTileResolution;
         config.qgisInstallFolder = TerrainDataServiceSettings.instance.QgisInstallFolder;
-        config.exportOnlyAboveSeaLevel = exportOnlyAboveSeaLevel;
-        config.exportSeaFloorClampElevation = exportSeaFloorClampElevation;
+        config.exportUseGshhgMask = exportUseGshhgMask;
+        config.gshhgVectorPath = gshhgVectorPath;
+        config.exportWaterMaskElevation = exportWaterMaskElevation;
         config.exportClampElevation = exportClampElevation;
         config.writeExportManifest = writeExportManifest;
         config.northBound = northBound;

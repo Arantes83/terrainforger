@@ -138,10 +138,6 @@ public static class TerrainGeoTiffExporter
             config.minElevation = exportedDemMetadata.Min(metadata => metadata.minElevation);
             config.maxElevation = exportedDemMetadata.Max(metadata => metadata.maxElevation);
         }
-        else if (config.exportOnlyAboveSeaLevel)
-        {
-            config.minElevation = config.exportSeaFloorClampElevation;
-        }
     }
 
     private static TerrainTileElevationMetadata ExportDemTile(
@@ -177,9 +173,9 @@ public static class TerrainGeoTiffExporter
                 $"Unexpected GDAL output size for tile {tileLabel}. Expected {config.heightmapResolution}x{config.heightmapResolution}, got {raster.Width}x{raster.Height}.");
         }
 
-        if (config.exportOnlyAboveSeaLevel)
+        if (config.exportUseGshhgMask)
         {
-            raster.RemapValuesAtOrBelowSeaLevel(config.exportSeaFloorClampElevation);
+            ApplyGshhgMask(config, raster, tempRoot, tileLabel, tileBounds);
         }
 
         var rawFileName = TerrainTileNaming.ResolvePattern(config.filePattern, row, col);
@@ -216,6 +212,36 @@ public static class TerrainGeoTiffExporter
             config.satelliteTileResolution,
             dataType: null,
             format: "PNG");
+    }
+
+    private static void ApplyGshhgMask(
+        TerrainTileImportConfig config,
+        EnviFloatRaster raster,
+        string tempRoot,
+        string tileLabel,
+        TileBounds tileBounds)
+    {
+        var tempMaskPath = Path.Combine(tempRoot, $"{tileLabel}_landmask.bin");
+        RunGdalRasterize(
+            config.qgisInstallFolder,
+            ResolvePath(config.gshhgVectorPath),
+            tempMaskPath,
+            tileBounds.west,
+            tileBounds.south,
+            tileBounds.east,
+            tileBounds.north,
+            config.heightmapResolution,
+            config.heightmapResolution,
+            burnValue: 1);
+
+        var landMask = EnviByteRaster.Read(tempMaskPath);
+        if (landMask.Width != raster.Width || landMask.Height != raster.Height)
+        {
+            throw new InvalidOperationException(
+                $"Unexpected GSHHG mask size for tile {tileLabel}. Expected {raster.Width}x{raster.Height}, got {landMask.Width}x{landMask.Height}.");
+        }
+
+        raster.RemapValuesOutsideLandMask(landMask.Values, config.exportWaterMaskElevation);
     }
 
     private static void RunGdalWarp(
@@ -262,6 +288,47 @@ public static class TerrainGeoTiffExporter
         RunProcess(executable, string.Join(" ", args), "QGIS gdalwarp");
     }
 
+    private static void RunGdalRasterize(
+        string qgisInstallFolder,
+        string inputVectorPath,
+        string outputPath,
+        double west,
+        double south,
+        double east,
+        double north,
+        int width,
+        int height,
+        byte burnValue)
+    {
+        var executable = ResolveQgisExecutable(qgisInstallFolder, "gdal_rasterize.exe");
+        var args = new List<string>
+        {
+            "-burn",
+            burnValue.ToString(CultureInfo.InvariantCulture),
+            "-init",
+            "0",
+            "-at",
+            "-ot",
+            "Byte",
+            "-of",
+            "ENVI",
+            "-a_srs",
+            "EPSG:4326",
+            "-te",
+            FormatDouble(west),
+            FormatDouble(south),
+            FormatDouble(east),
+            FormatDouble(north),
+            "-ts",
+            width.ToString(CultureInfo.InvariantCulture),
+            height.ToString(CultureInfo.InvariantCulture),
+            Quote(inputVectorPath),
+            Quote(outputPath)
+        };
+
+        RunProcess(executable, string.Join(" ", args), "QGIS gdal_rasterize");
+    }
+
     private static TerrainTileElevationMetadata WriteRaw16Tile(TerrainTileImportConfig config, EnviFloatRaster raster, string outputRawPath)
     {
         var processedMin = float.PositiveInfinity;
@@ -271,7 +338,7 @@ public static class TerrainGeoTiffExporter
         {
             for (var x = 0; x < raster.Width; x++)
             {
-                var value = NormalizeRasterSample(raster.GetValue(y, x), config.exportOnlyAboveSeaLevel ? config.exportSeaFloorClampElevation : 0f);
+                var value = NormalizeRasterSample(raster.GetValue(y, x), config.exportUseGshhgMask ? config.exportWaterMaskElevation : 0f);
                 processedMin = Mathf.Min(processedMin, value);
                 processedMax = Mathf.Max(processedMax, value);
             }
@@ -299,7 +366,7 @@ public static class TerrainGeoTiffExporter
             {
                 for (var x = 0; x < raster.Width; x++)
                 {
-                    var value = NormalizeRasterSample(raster.GetValue(y, x), config.exportOnlyAboveSeaLevel ? config.exportSeaFloorClampElevation : 0f);
+                    var value = NormalizeRasterSample(raster.GetValue(y, x), config.exportUseGshhgMask ? config.exportWaterMaskElevation : 0f);
                     var normalized = isFlatTile ? 0f : Mathf.InverseLerp(exportMin, exportMax, value);
                     var raw = (ushort)Mathf.Clamp(Mathf.RoundToInt(normalized * 65535f), 0, 65535);
                     writer.Write(raw);
@@ -371,8 +438,9 @@ public static class TerrainGeoTiffExporter
         builder.AppendLine($"Export DEM: {exportDem}");
         builder.AppendLine($"Export Satellite: {exportSatellite}");
         builder.AppendLine($"Clamp Enabled: {config.exportClampElevation}");
-        builder.AppendLine($"Only Above Sea Level: {config.exportOnlyAboveSeaLevel}");
-        builder.AppendLine($"Sea Floor Clamp Elevation: {config.exportSeaFloorClampElevation}");
+        builder.AppendLine($"Use GSHHG Land Mask: {config.exportUseGshhgMask}");
+        builder.AppendLine($"GSHHG Vector Path: {ResolveOptionalPath(config.gshhgVectorPath)}");
+        builder.AppendLine($"Water Mask Elevation: {config.exportWaterMaskElevation}");
         builder.AppendLine($"Min Elevation: {config.minElevation}");
         builder.AppendLine($"Max Elevation: {config.maxElevation}");
         builder.AppendLine("Tiles:");
@@ -452,6 +520,20 @@ public static class TerrainGeoTiffExporter
         if (string.IsNullOrWhiteSpace(config.inputFolder))
         {
             throw new InvalidOperationException("RAW output folder is required.");
+        }
+
+        if (config.exportUseGshhgMask)
+        {
+            if (string.IsNullOrWhiteSpace(config.gshhgVectorPath))
+            {
+                throw new InvalidOperationException("GSHHG vector path is required when 'Use GSHHG Land Mask' is enabled.");
+            }
+
+            var gshhgVectorPath = ResolvePath(config.gshhgVectorPath);
+            if (!File.Exists(gshhgVectorPath))
+            {
+                throw new FileNotFoundException("GSHHG vector file not found.", gshhgVectorPath);
+            }
         }
 
     }
@@ -812,14 +894,19 @@ public static class TerrainGeoTiffExporter
             return Values[(y * Width) + x];
         }
 
-        public void RemapValuesAtOrBelowSeaLevel(float seaFloorClampElevation)
+        public void RemapValuesOutsideLandMask(byte[] landMaskValues, float waterElevation)
         {
+            if (landMaskValues == null || landMaskValues.Length != Values.Length)
+            {
+                throw new InvalidOperationException("The GSHHG mask size does not match the DEM raster size.");
+            }
+
             for (var i = 0; i < Values.Length; i++)
             {
                 var value = Values[i];
-                if (float.IsNaN(value) || float.IsInfinity(value) || value <= 0f)
+                if (landMaskValues[i] == 0 || float.IsNaN(value) || float.IsInfinity(value))
                 {
-                    Values[i] = seaFloorClampElevation;
+                    Values[i] = waterElevation;
                 }
             }
         }
@@ -856,6 +943,81 @@ public static class TerrainGeoTiffExporter
 
         private static int ParseInt(string value)
         {
+            return int.Parse(value, CultureInfo.InvariantCulture);
+        }
+    }
+
+    private sealed class EnviByteRaster
+    {
+        public int Width { get; private set; }
+        public int Height { get; private set; }
+        public byte[] Values { get; private set; }
+
+        public static EnviByteRaster Read(string binaryPath)
+        {
+            var headerPath = Path.ChangeExtension(binaryPath, ".hdr");
+            if (!File.Exists(headerPath))
+            {
+                throw new FileNotFoundException("ENVI header file not found.", headerPath);
+            }
+
+            var metadata = ParseHeader(headerPath);
+            var width = ParseInt(metadata, "samples");
+            var height = ParseInt(metadata, "lines");
+            var bands = ParseInt(metadata, "bands");
+            var dataType = ParseInt(metadata, "data type");
+
+            if (bands != 1)
+            {
+                throw new InvalidOperationException("Only single-band ENVI rasters are supported.");
+            }
+
+            if (dataType != 1)
+            {
+                throw new InvalidOperationException("Expected ENVI Byte raster (data type = 1).");
+            }
+
+            var values = File.ReadAllBytes(binaryPath);
+            if (values.Length < width * height)
+            {
+                throw new EndOfStreamException("Unexpected end of ENVI byte raster.");
+            }
+
+            return new EnviByteRaster
+            {
+                Width = width,
+                Height = height,
+                Values = values
+            };
+        }
+
+        private static Dictionary<string, string> ParseHeader(string headerPath)
+        {
+            var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var lines = File.ReadAllLines(headerPath);
+            foreach (var line in lines)
+            {
+                var separatorIndex = line.IndexOf('=');
+                if (separatorIndex <= 0)
+                {
+                    continue;
+                }
+
+                var key = line.Substring(0, separatorIndex).Trim();
+                var value = line.Substring(separatorIndex + 1).Trim().Trim('{', '}');
+                metadata[key] = value;
+            }
+
+            return metadata;
+        }
+
+        private static int ParseInt(Dictionary<string, string> metadata, string key)
+        {
+            if (!metadata.TryGetValue(key, out var value))
+            {
+                throw new InvalidOperationException($"Missing ENVI header value '{key}'.");
+            }
+
             return int.Parse(value, CultureInfo.InvariantCulture);
         }
     }

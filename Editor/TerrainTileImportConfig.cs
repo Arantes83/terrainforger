@@ -52,10 +52,12 @@ public class TerrainTileImportConfig : ScriptableObject
     public int satelliteTileResolution = 1024;
     [Tooltip("Path to the QGIS installation folder. Example: C:/Program Files/QGIS 3.36.1")]
     public string qgisInstallFolder = string.Empty;
-    [Tooltip("If enabled, values below 0 m are remapped to the configured floor before scaling to RAW.")]
-    public bool exportOnlyAboveSeaLevel;
-    [Tooltip("When 'Only Above Sea Level' is enabled, values below 0 m are remapped to this elevation before RAW conversion.")]
-    public float exportSeaFloorClampElevation = -10f;
+    [Tooltip("When enabled, TerrainForger uses a GSHHG land polygon vector to decide which samples remain land during DEM export.")]
+    public bool exportUseGshhgMask;
+    [Tooltip("Path to a GSHHG land polygon vector file, usually a .shp extracted from the official dataset.")]
+    public string gshhgVectorPath = string.Empty;
+    [Tooltip("Elevation assigned to DEM samples outside the GSHHG land mask.")]
+    public float exportWaterMaskElevation = -10f;
     [Tooltip("When enabled, values are clamped to the min/max elevation range before conversion.")]
     public bool exportClampElevation = true;
     [Tooltip("Writes a text manifest with the export settings next to the RAW tiles.")]
