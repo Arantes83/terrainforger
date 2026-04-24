@@ -353,7 +353,7 @@ public static class TerrainGeoTiffExporter
                 Directory.Delete(datasetRoot, true);
             }
 
-            ZipFile.ExtractToDirectory(archivePath, GetGshhgCacheRoot());
+            ExtractZipArchive(archivePath, GetGshhgCacheRoot());
         }
         finally
         {
@@ -372,6 +372,47 @@ public static class TerrainGeoTiffExporter
     {
         var projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
         return Path.Combine(projectRoot, "Library", "TerrainForger", "GSHHG");
+    }
+
+    private static void ExtractZipArchive(string archivePath, string destinationRoot)
+    {
+        using (var stream = File.OpenRead(archivePath))
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Read))
+        {
+            foreach (var entry in archive.Entries)
+            {
+                if (string.IsNullOrEmpty(entry.FullName))
+                {
+                    continue;
+                }
+
+                var normalizedEntryPath = entry.FullName.Replace('/', Path.DirectorySeparatorChar);
+                var destinationPath = Path.GetFullPath(Path.Combine(destinationRoot, normalizedEntryPath));
+                if (!destinationPath.StartsWith(Path.GetFullPath(destinationRoot), StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException($"Unsafe path found in GSHHG archive: {entry.FullName}");
+                }
+
+                if (entry.FullName.EndsWith("/", StringComparison.Ordinal) ||
+                    entry.FullName.EndsWith("\\", StringComparison.Ordinal))
+                {
+                    Directory.CreateDirectory(destinationPath);
+                    continue;
+                }
+
+                var destinationDirectory = Path.GetDirectoryName(destinationPath);
+                if (!string.IsNullOrEmpty(destinationDirectory))
+                {
+                    Directory.CreateDirectory(destinationDirectory);
+                }
+
+                using (var entryStream = entry.Open())
+                using (var outputStream = File.Create(destinationPath))
+                {
+                    entryStream.CopyTo(outputStream);
+                }
+            }
+        }
     }
 
     private static void RunGdalWarp(
