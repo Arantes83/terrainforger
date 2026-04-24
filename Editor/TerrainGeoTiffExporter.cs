@@ -322,15 +322,16 @@ public static class TerrainGeoTiffExporter
 
     private static string EnsureGshhgDatasetAvailable()
     {
-        var datasetRoot = Path.Combine(GetGshhgCacheRoot(), GshhgExtractedFolderName);
-        var markerFile = Path.Combine(datasetRoot, "GSHHS_shp", "i", "GSHHS_i_L1.shp");
-        if (File.Exists(markerFile))
+        var cacheRoot = GetGshhgCacheRoot();
+        var existingDatasetRoot = FindGshhgDatasetRoot(cacheRoot);
+        if (!string.IsNullOrEmpty(existingDatasetRoot))
         {
-            return datasetRoot;
+            return existingDatasetRoot;
         }
 
-        Directory.CreateDirectory(GetGshhgCacheRoot());
-        var archivePath = Path.Combine(GetGshhgCacheRoot(), GshhgArchiveFileName);
+        var datasetRoot = Path.Combine(cacheRoot, GshhgExtractedFolderName);
+        Directory.CreateDirectory(cacheRoot);
+        var archivePath = Path.Combine(cacheRoot, GshhgArchiveFileName);
 
         try
         {
@@ -353,25 +354,46 @@ public static class TerrainGeoTiffExporter
                 Directory.Delete(datasetRoot, true);
             }
 
-            ExtractZipArchive(archivePath, GetGshhgCacheRoot());
+            ExtractZipArchive(archivePath, cacheRoot);
         }
         finally
         {
             EditorUtility.ClearProgressBar();
         }
 
-        if (!File.Exists(markerFile))
+        var extractedDatasetRoot = FindGshhgDatasetRoot(cacheRoot);
+        if (string.IsNullOrEmpty(extractedDatasetRoot))
         {
-            throw new FileNotFoundException("GSHHG dataset was extracted but the expected shapefiles were not found.", markerFile);
+            throw new FileNotFoundException(
+                "GSHHG dataset was extracted but the expected shapefiles were not found.",
+                Path.Combine(cacheRoot, "GSHHS_shp", "i", "GSHHS_i_L1.shp"));
         }
 
-        return datasetRoot;
+        return extractedDatasetRoot;
     }
 
     private static string GetGshhgCacheRoot()
     {
         var projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
         return Path.Combine(projectRoot, "Library", "TerrainForger", "GSHHG");
+    }
+
+    private static string FindGshhgDatasetRoot(string cacheRoot)
+    {
+        var directMarker = Path.Combine(cacheRoot, "GSHHS_shp", "i", "GSHHS_i_L1.shp");
+        if (File.Exists(directMarker))
+        {
+            return cacheRoot;
+        }
+
+        var nestedRoot = Path.Combine(cacheRoot, GshhgExtractedFolderName);
+        var nestedMarker = Path.Combine(nestedRoot, "GSHHS_shp", "i", "GSHHS_i_L1.shp");
+        if (File.Exists(nestedMarker))
+        {
+            return nestedRoot;
+        }
+
+        return string.Empty;
     }
 
     private static void ExtractZipArchive(string archivePath, string destinationRoot)
@@ -478,7 +500,6 @@ public static class TerrainGeoTiffExporter
             burnValue.ToString(CultureInfo.InvariantCulture),
             "-init",
             "0",
-            "-at",
             "-ot",
             "Byte",
             "-of",
