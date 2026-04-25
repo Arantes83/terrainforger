@@ -25,12 +25,13 @@ The current supported menu flow is:
 ## Features
 
 - Download DEM data through the integrated OpenTopography workflow
-- Download satellite imagery through the integrated Mapbox workflow
-- Preview source rasters and DEM coverage inside the Unity Editor
+- Download satellite imagery through the integrated Mapbox or Google Maps Platform workflows
+- Preview source rasters and DEM coverage inside the Unity Editor with previews docked in a right-hand column
 - Export DEM GeoTIFFs to tiled RAW heightmaps
 - Export satellite GeoTIFFs to tiled PNGs
 - Mask coastlines during DEM export with either `GSHHG` or `OpenStreetMap`
 - Import tiled RAW terrain data into Unity Terrain assets
+- Configure the generated water plane altitude during tile import
 
 ## Dependencies
 
@@ -109,8 +110,8 @@ The TerrainForger Data Services panel currently exposes:
 
 Important note:
 
-- The integrated `Get GIS Data` workflow currently uses `OpenTopography` for DEM downloads and `Mapbox` for satellite downloads.
-- `Google Maps Platform` remains available in service settings, but it is not currently used by the integrated acquisition window.
+- The integrated `Get GIS Data` workflow uses `OpenTopography` for DEM downloads and lets you choose `Mapbox` or `Google Maps Platform` for satellite downloads.
+- Google Maps Platform satellite downloads use the official Map Tiles API session flow and remain subject to Google Maps Platform quota, attribution, and storage restrictions.
 
 Direct credential pages:
 

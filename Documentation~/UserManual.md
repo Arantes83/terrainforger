@@ -6,11 +6,9 @@
 
 ## 1.1 What is TerrainForger
 
-TerrainForger is a Unity Editor package designed for importing, processing, and generating large-scale terrains from real-world geospatial data sources such as DEM GeoTIFFs and satellite imagery.
+TerrainForger is a Unity Editor package for importing, processing, and generating large-scale terrains from real-world geospatial data such as DEM GeoTIFFs and satellite imagery.
 
-Its primary goal is to provide a production-ready workflow for converting GIS elevation data and satellite imagery into Unity Terrain workflows.
-
-TerrainForger standardizes the GIS -> Unity terrain pipeline, reducing manual work, import errors, and inconsistent terrain generation.
+Its goal is to provide a production-oriented GIS -> Unity pipeline that reduces manual work, import errors, and inconsistent terrain generation.
 
 This manual covers installation, configuration, usage, workflows, troubleshooting, performance guidelines, and best practices.
 
@@ -18,7 +16,7 @@ This manual covers installation, configuration, usage, workflows, troubleshootin
 
 ## 1.2 Primary Purpose
 
-TerrainForger was created to simplify the transformation of GIS datasets into Unity terrains while preserving scale consistency, reducing manual intervention, and avoiding common terrain import failures.
+TerrainForger was created to simplify the transformation of GIS datasets into Unity terrains while preserving scale consistency and reducing manual intervention.
 
 Main goals:
 
@@ -62,14 +60,6 @@ TerrainForger declares Unity `2020.3` in the package metadata and is intended fo
 
 Other Unity versions may work, but they are not guaranteed to behave identically due to API differences in Unity Editor tools, Terrain systems, asset serialization, and terrain import pipelines.
 
-Using different Unity versions may cause:
-
-* Editor menu issues
-* Terrain import inconsistencies
-* Asset serialization conflicts
-* Terrain API incompatibilities
-* Unexpected behavior during GeoTIFF import workflows
-
 For maximum stability, use Unity 2020.3 LTS whenever possible.
 
 ---
@@ -93,12 +83,12 @@ Large terrain projects require significantly more disk throughput and memory tha
 
 ## 2.2 Importing TerrainForger into Unity
 
-1. Clone or download the repository
-2. Install TerrainForger as a Unity package
-3. Open Unity
-4. Wait for script compilation to finish
-5. Resolve any compile issues before continuing
-6. Access the package through the Unity menu
+1. Clone or download the repository.
+2. Install TerrainForger as a Unity package.
+3. Open Unity.
+4. Wait for script compilation to finish.
+5. Resolve any compile issues before continuing.
+6. Access the package through the Unity menu.
 
 Repository:
 
@@ -132,13 +122,11 @@ Window > Package Manager > Add package from git URL...
 
 Use `Add package from disk...` and select the repository `package.json`.
 
-After compilation, access the tool through:
+After compilation, access the tools through:
 
 ```text
 TerrainForger
 ```
-
-If the menu does not appear, see the Troubleshooting section.
 
 ---
 
@@ -146,49 +134,43 @@ If the menu does not appear, see the Troubleshooting section.
 
 TerrainForger automatically creates the required working folder structure inside `Assets/` during the workflow.
 
-Manual folder creation is not required.
-
 Official generated structure:
 
 ```text
 Assets/
-├── Generated/
-│   └── TerrainTiles/
-│       └── Generated Unity terrain tile assets
-│
-└── Terrain/
-    ├── GSHHG/
-    │   └── Auto-downloaded GSHHG shoreline dataset
-    │
-    ├── GeoTIFF/
-    │   └── Source GeoTIFF files used as geographic reference/input
-    │
-    ├── OSMCoastline/
-    │   └── Auto-downloaded OpenStreetMap coastline support data
-    │
-    ├── PNG/
-    │   └── Generated satellite PNG tiles
-    │
-    ├── Raw/
-    │   └── Generated RAW 16-bit heightmap tiles
-    │
-    └── SAT/
-        └── Source or downloaded satellite raster data
+|-- Generated/
+|   `-- TerrainTiles/
+|       `-- Generated Unity terrain tile assets
+|
+`-- Terrain/
+    |-- GSHHG/
+    |   `-- Auto-downloaded GSHHG shoreline dataset
+    |
+    |-- GeoTIFF/
+    |   `-- Source GeoTIFF files used as geographic reference/input
+    |
+    |-- OSMCoastline/
+    |   `-- Auto-downloaded OpenStreetMap coastline support data
+    |
+    |-- PNG/
+    |   `-- Generated satellite PNG tiles
+    |
+    |-- Raw/
+    |   `-- Generated RAW 16-bit heightmap tiles
+    |
+    `-- SAT/
+        `-- Source or downloaded satellite raster data
 ```
 
 Folder purpose:
 
 * `GSHHG/` stores the auto-downloaded GSHHG shoreline dataset
 * `GeoTIFF/` stores source geographic raster data
-* `SAT/` stores satellite raster source files
+* `SAT/` stores source or downloaded satellite rasters
 * `Raw/` stores exported RAW heightmaps for Unity Terrain
 * `PNG/` stores generated satellite image tiles
 * `OSMCoastline/` stores OpenStreetMap coastline support data
 * `Generated/TerrainTiles/` stores the final generated Unity terrain tiles
-
-Unity also generates `.meta` files automatically for every folder and asset. These files must remain versioned when committed inside the consuming Unity project.
-
-Avoid manually changing this structure unless there is a specific production requirement.
 
 ---
 
@@ -223,8 +205,6 @@ Supported pipeline:
 
 Changing the order of this workflow may produce invalid terrains.
 
-This is the official supported production workflow.
-
 ---
 
 # 4. GIS Data Preparation
@@ -256,30 +236,56 @@ Always validate:
 * terrain scale compatibility
 * elevation reference consistency
 
-Recommended:
-
-* consistent projected coordinate systems when preparing source data
-* validated geographic bounds before export
-
 Avoid mixing CRS definitions between DEM and imagery.
 
 Projection mismatch is one of the most common causes of invalid terrain generation.
 
 ---
 
-# 5. Geotiff2Raw Export
+# 5. Get GIS Data
 
 ## 5.1 Module Purpose
+
+This window handles local source files, geographic bounds, provider selection, DEM downloads, and satellite downloads.
+
+The preview panels are displayed in a right-hand column so the source, DEM, and satellite previews stay visible while the main controls remain usable.
+
+---
+
+## 5.2 Map Bounds
+
+`Map Bounds` is collapsed by default.
+
+Open it only when you need to edit bounds manually.
+
+If a valid source file is selected, TerrainForger locks manual bounds and uses the exact extent read from the source.
+
+---
+
+## 5.3 Integrated Providers
+
+Current integrated workflow usage:
+
+* OpenTopography is used for DEM downloads
+* Mapbox or Google Maps Platform can be used for satellite downloads
+
+Google Maps Platform satellite downloads use the official Map Tiles API session flow and remain subject to Google Maps Platform quota, attribution, and storage restrictions.
+
+---
+
+# 6. Geotiff2Raw Export
+
+## 6.1 Module Purpose
 
 This module converts DEM GeoTIFF files into RAW heightmaps compatible with Unity Terrain.
 
 It also supports synchronized DEM + satellite workflows and coastline masking.
 
-This is one of the most critical modules of the package.
+The DEM preview for this window is shown in the right-hand preview column so the tile split can be validated without pushing the main controls out of view.
 
 ---
 
-## 5.2 Source and Output Section
+## 6.2 Source and Output Section
 
 ### DEM GeoTIFF
 
@@ -299,7 +305,7 @@ Destination folder for generated satellite PNG tiles.
 
 ---
 
-## 5.3 Export Parameters
+## 6.3 Export Parameters
 
 Main parameters:
 
@@ -312,11 +318,9 @@ Main parameters:
 
 Incorrect values here create invalid terrain imports.
 
-Always validate export parameters before generating RAW files.
-
 ---
 
-## 5.4 Coastline Mask
+## 6.4 Coastline Mask
 
 TerrainForger supports masking exported DEM tiles using land polygons instead of clipping by terrain altitude.
 
@@ -333,25 +337,9 @@ Behavior:
 
 ---
 
-## 5.5 Common Export Errors
+# 7. Terrain Tile Importer
 
-Typical issues:
-
-* DEM not detected
-* Satellite mismatch
-* unsupported resolution
-* RAW export failure
-* wrong tile pairing
-* missing QGIS path
-* invalid coastline dataset extraction
-
-Most failures are caused by invalid source preparation or missing external dependencies.
-
----
-
-# 6. Terrain Tile Importer
-
-## 6.1 Module Purpose
+## 7.1 Module Purpose
 
 This module imports generated RAW files and creates Unity Terrain tiles.
 
@@ -363,25 +351,25 @@ It supports:
 * material setup
 * grid configuration
 * large world support
+* configurable water plane creation at a user-defined altitude
 
 ---
 
-## 6.2 Import Considerations
+## 7.2 Water Plane
 
-Before importing:
+When enabled, TerrainForger creates a plane that covers the imported terrain footprint.
 
-* validate RAW output
-* confirm DEM and imagery alignment
-* confirm expected terrain resolution
-* verify tile count consistency
+You can configure:
 
-Incorrect imports usually originate from incorrect exports.
+* whether the plane is created
+* the exact water plane elevation in world Y
+* the material applied to the plane
 
 ---
 
-# 7. Terrain Data Services
+# 8. Terrain Data Services
 
-## 7.1 Module Purpose
+## 8.1 Module Purpose
 
 Responsible for controlled terrain data workflows and external data service configuration.
 
@@ -389,7 +377,7 @@ This module must be configured carefully to avoid credential exposure and unstab
 
 ---
 
-## 7.2 Current Providers
+## 8.2 Current Providers
 
 The Terrain Data Services panel currently exposes:
 
@@ -398,31 +386,13 @@ The Terrain Data Services panel currently exposes:
 * Google Maps Platform
 * QGIS
 
-Current integrated workflow usage:
-
-* OpenTopography is used for DEM downloads
-* Mapbox is used for satellite downloads
-* Google Maps Platform can be configured, but it is not currently used by the integrated acquisition window
+Credentials are stored locally in the consuming project's `UserSettings`.
 
 ---
 
-## 7.3 Best Practices
+# 9. Performance Guidelines
 
-Recommended:
-
-* avoid exposing credentials in repositories
-* keep service configuration separated from generated assets
-* validate imported data before production usage
-
-Never treat terrain services as disposable temporary setup.
-
-This is production infrastructure.
-
----
-
-# 8. Performance Guidelines
-
-## 8.1 Terrain Resolution Limits
+## 9.1 Terrain Resolution Limits
 
 Avoid extremely large single terrains.
 
@@ -433,11 +403,9 @@ Prefer:
 * predictable memory usage
 * staged imports instead of full-world imports
 
-Large terrains should be split intentionally.
-
 ---
 
-## 8.2 Import Performance
+## 9.2 Import Performance
 
 Recommended:
 
@@ -448,13 +416,11 @@ Recommended:
 
 Avoid importing massive terrains as a single operation.
 
-Editor freezes are often caused by excessive terrain resolution.
-
 ---
 
-# 9. Troubleshooting
+# 10. Troubleshooting
 
-## 9.1 TerrainForger Menu Does Not Appear
+## 10.1 TerrainForger Menu Does Not Appear
 
 Check:
 
@@ -463,11 +429,9 @@ Check:
 * package imported correctly
 * supported Unity version
 
-This is usually caused by compile errors or package import issues.
-
 ---
 
-## 9.2 Incorrect Terrain Scale
+## 10.2 Incorrect Terrain Scale
 
 Usually caused by:
 
@@ -479,7 +443,7 @@ Always verify source data before debugging import code.
 
 ---
 
-## 9.3 Import Freezes Unity
+## 10.3 Import Freezes Unity
 
 Usually caused by:
 
@@ -492,9 +456,9 @@ Reduce terrain scope before attempting full imports.
 
 ---
 
-# 10. Best Practices
+# 11. Best Practices
 
-## 10.1 Folder Discipline
+## 11.1 Folder Discipline
 
 Never mix:
 
@@ -504,60 +468,13 @@ Never mix:
 
 Use strict separation between source and generated content.
 
-This prevents accidental corruption and improves reproducibility.
-
 ---
 
-## 10.2 Data Safety
-
-Always:
-
-* backup original DEM files
-* keep DEM and satellite datasets synchronized
-* validate coordinate systems before importing
-* use consistent tile naming conventions
-* preserve reproducible workflows
-
-Terrain pipelines must be deterministic.
-
----
-
-## 10.3 Credential Safety
+## 11.2 Credential Safety
 
 TerrainForger stores service credentials locally in the consuming project's `UserSettings`.
 
-This means:
-
-* API keys are not hardcoded in the package
-* credentials are not distributed with the package by default
-* `UserSettings/` should not be committed
-
----
-
-# 11. Frequently Asked Questions
-
-## 11.1 Can I Use Unity 2021 or Newer?
-
-Possibly yes.
-
-The package baseline is Unity `2020.3`, but newer versions may work depending on Editor API compatibility.
-
-Other versions may work but are not guaranteed.
-
----
-
-## 11.2 Should I Use One Large Terrain or Multiple Tiles?
-
-Multiple tiles.
-
-This improves:
-
-* performance
-* memory management
-* terrain streaming
-* production stability
-
-Single massive terrains are rarely the correct production solution.
+API keys and tokens are not hardcoded in the distributed package.
 
 ---
 
@@ -570,8 +487,7 @@ Single massive terrains are rarely the correct production solution.
 * mismatched tile sizes cause stitching issues
 * extremely large textures may exceed memory budgets
 * shoreline datasets may not perfectly match every coastline in every region
-
-Always validate source data before import.
+* Google Maps Platform imagery usage is governed by Google Maps Platform policies
 
 ---
 
@@ -584,11 +500,3 @@ Documentation~/index.md
 ```
 
 should remain as the short entry page.
-
-The complete operational documentation should remain in:
-
-```text
-Documentation~/UserManual.md
-```
-
-This is the recommended structure.

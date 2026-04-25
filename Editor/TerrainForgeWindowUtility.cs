@@ -106,11 +106,11 @@ public static class TerrainForgeWindowUtility
     {
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
-            EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
-            value.hemisphere = (LatitudeHemisphere)EditorGUILayout.EnumPopup("Hemisphere", value.hemisphere);
-            value.degrees = DrawIntField("Degrees", value.degrees, 0, 90);
-            value.minutes = DrawIntField("Minutes", value.minutes, 0, 59);
-            value.tenthsOfMinutes = DrawIntField("Tenths Of Minutes", value.tenthsOfMinutes, 0, 9);
+            EditorGUILayout.LabelField(new GUIContent(label, "Latitude bound used for geographic downloads and export coverage."), EditorStyles.boldLabel);
+            value.hemisphere = (LatitudeHemisphere)EditorGUILayout.EnumPopup(new GUIContent("Hemisphere", "Choose North or South for this latitude bound."), value.hemisphere);
+            value.degrees = DrawIntField(new GUIContent("Degrees", "Whole latitude degrees for this bound."), value.degrees, 0, 90);
+            value.minutes = DrawIntField(new GUIContent("Minutes", "Latitude minutes for this bound."), value.minutes, 0, 59);
+            value.tenthsOfMinutes = DrawIntField(new GUIContent("Tenths Of Minutes", "Tenths of a minute for this latitude bound."), value.tenthsOfMinutes, 0, 9);
         }
 
         return value;
@@ -120,11 +120,11 @@ public static class TerrainForgeWindowUtility
     {
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
-            EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
-            value.hemisphere = (LongitudeHemisphere)EditorGUILayout.EnumPopup("Hemisphere", value.hemisphere);
-            value.degrees = DrawIntField("Degrees", value.degrees, 0, 180);
-            value.minutes = DrawIntField("Minutes", value.minutes, 0, 59);
-            value.tenthsOfMinutes = DrawIntField("Tenths Of Minutes", value.tenthsOfMinutes, 0, 9);
+            EditorGUILayout.LabelField(new GUIContent(label, "Longitude bound used for geographic downloads and export coverage."), EditorStyles.boldLabel);
+            value.hemisphere = (LongitudeHemisphere)EditorGUILayout.EnumPopup(new GUIContent("Hemisphere", "Choose East or West for this longitude bound."), value.hemisphere);
+            value.degrees = DrawIntField(new GUIContent("Degrees", "Whole longitude degrees for this bound."), value.degrees, 0, 180);
+            value.minutes = DrawIntField(new GUIContent("Minutes", "Longitude minutes for this bound."), value.minutes, 0, 59);
+            value.tenthsOfMinutes = DrawIntField(new GUIContent("Tenths Of Minutes", "Tenths of a minute for this longitude bound."), value.tenthsOfMinutes, 0, 9);
         }
 
         return value;
@@ -134,7 +134,7 @@ public static class TerrainForgeWindowUtility
     {
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (includeGeoTiffButton && GUILayout.Button("Browse GeoTIFF"))
+            if (includeGeoTiffButton && GUILayout.Button(new GUIContent("Browse GeoTIFF", "Choose a GeoTIFF file from disk.")))
             {
                 BrowseGeoTiff(settings);
             }
@@ -158,7 +158,19 @@ public static class TerrainForgeWindowUtility
             }
         }
 
-        return EditorGUILayout.Popup(label, currentIndex, displayOptions);
+        return EditorGUILayout.Popup(new GUIContent(label, "Choose which configured provider TerrainForger should use for this operation."), currentIndex, displayOptions);
+    }
+
+    public static int DrawIntField(GUIContent label, int value, int minValue = int.MinValue, int maxValue = int.MaxValue)
+    {
+        EditorGUI.BeginChangeCheck();
+        var newValue = EditorGUILayout.IntField(label, value);
+        if (EditorGUI.EndChangeCheck())
+        {
+            return Mathf.Clamp(newValue, minValue, maxValue);
+        }
+
+        return value;
     }
 
     public static TerrainBuiltInProviderInfo[] GetConfiguredProviders(

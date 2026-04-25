@@ -5,6 +5,8 @@ public class TerrainForgeImportTilesWindow : EditorWindow
 {
     private const string RawInputDefault = "Assets/Terrain/Raw";
     private const string PngInputDefault = "Assets/Terrain/PNG";
+    private const string TerrainAssetsDefault = "Assets/Generated/TerrainTiles";
+    private const string TerrainRootDefault = "TerrainTileRoot";
 
     private Vector2 scrollPosition;
     private static readonly System.Collections.Generic.List<string> workflowLog = new System.Collections.Generic.List<string>();
@@ -13,7 +15,7 @@ public class TerrainForgeImportTilesWindow : EditorWindow
     public static void Open()
     {
         var window = GetWindow<TerrainForgeImportTilesWindow>("Import Tiles");
-        window.minSize = new Vector2(620f, 520f);
+        window.minSize = new Vector2(700f, 560f);
         window.Show();
         window.Focus();
     }
@@ -23,7 +25,7 @@ public class TerrainForgeImportTilesWindow : EditorWindow
         scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
 
         var settings = TerrainForgeWorkflowSettings.instance;
-        SyncDefaultInputFolder(settings);
+        SyncImportDefaults(settings);
 
         TerrainForgeWindowUtility.DrawSettingsHeader(
             settings,
@@ -31,59 +33,49 @@ public class TerrainForgeImportTilesWindow : EditorWindow
             "Import RAW 16-bit height tiles into Unity Terrain with proper offsets, vertical scale and neighbor stitching.");
         TerrainForgeWindowUtility.DrawImportSummary(settings);
 
-        var serializedObject = new SerializedObject(settings);
-        serializedObject.Update();
-
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
-            EditorGUILayout.LabelField("Terrain Settings", EditorStyles.boldLabel);
-            TerrainForgeWindowUtility.DrawProperty(serializedObject, "groupingId", "Grouping ID");
-            TerrainForgeWindowUtility.DrawProperty(serializedObject, "allowAutoConnect", "Allow Auto Connect");
-            TerrainForgeWindowUtility.DrawProperty(serializedObject, "drawInstanced", "Draw Instanced");
-            TerrainForgeWindowUtility.DrawProperty(serializedObject, "heightmapPixelError", "Heightmap Pixel Error");
-            TerrainForgeWindowUtility.DrawProperty(serializedObject, "basemapDistance", "Basemap Distance");
-        }
-
-        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-        {
-            EditorGUILayout.LabelField("Output", EditorStyles.boldLabel);
-            TerrainForgeWindowUtility.DrawProperty(serializedObject, "outputFolder", "Terrain Asset Folder");
-            TerrainForgeWindowUtility.DrawProperty(serializedObject, "rootObjectName", "Root Object Name");
-            TerrainForgeWindowUtility.DrawProperty(serializedObject, "replaceExistingRoot", "Replace Existing Root");
+            EditorGUILayout.LabelField("Import Defaults", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "This window now always imports from Assets/Terrain/Raw and Assets/Terrain/PNG, writes TerrainData assets to Assets/Generated/TerrainTiles, and recreates TerrainTileRoot on every import.",
+                MessageType.None);
         }
 
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
             EditorGUILayout.LabelField("Water", EditorStyles.boldLabel);
-            settings.createWaterPlane = EditorGUILayout.Toggle("Create Water Plane At 0", settings.createWaterPlane);
+            settings.createWaterPlane = EditorGUILayout.Toggle(new GUIContent("Create Water Plane", "Create a plane that covers the imported terrain footprint after the tiles are generated."), settings.createWaterPlane);
+            using (new EditorGUI.DisabledScope(!settings.createWaterPlane))
+            {
+                settings.waterPlaneElevation = EditorGUILayout.FloatField(new GUIContent("Water Plane Elevation", "World-space Y altitude where the generated water plane should be placed."), settings.waterPlaneElevation);
+            }
             settings.waterMaterial = (Material)EditorGUILayout.ObjectField(
-                "Water Material",
+                new GUIContent("Water Material", "Optional material assigned to the generated water plane."),
                 settings.waterMaterial,
                 typeof(Material),
                 allowSceneObjects: false);
             EditorGUILayout.HelpBox(
-                "When enabled, TerrainForger creates a plane covering the imported terrain footprint at altitude 0 and applies the selected water material when available.",
+                "When enabled, TerrainForger creates a plane covering the imported terrain footprint at the selected water elevation and applies the selected material when available.",
                 MessageType.None);
         }
 
-        serializedObject.ApplyModifiedProperties();
         settings.SaveSettings();
 
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (GUILayout.Button("Reveal RAW Folder"))
+            if (GUILayout.Button(new GUIContent("Reveal RAW Folder", "Open the folder currently configured as the RAW tile input source.")))
             {
                 TerrainForgeWindowUtility.RevealFolder(settings.inputFolder, "RAW Folder Missing");
             }
 
-            if (GUILayout.Button("Reveal Terrain Assets"))
+            if (GUILayout.Button(new GUIContent("Reveal Terrain Assets", "Open the folder where TerrainForger will create TerrainData assets and terrain layers.")))
             {
                 TerrainForgeWindowUtility.RevealFolder(settings.outputFolder, "Terrain Asset Folder Missing");
             }
         }
 
         EditorGUILayout.Space();
-        if (GUILayout.Button("Import Terrains", GUILayout.Height(32f)))
+        if (GUILayout.Button(new GUIContent("Import Terrains", "Import the current RAW and PNG tile set into Unity Terrain using the active settings."), GUILayout.Height(32f)))
         {
             RunImport(settings);
         }
@@ -108,10 +100,13 @@ public class TerrainForgeImportTilesWindow : EditorWindow
         }
     }
 
-    private static void SyncDefaultInputFolder(TerrainForgeWorkflowSettings settings)
+    private static void SyncImportDefaults(TerrainForgeWorkflowSettings settings)
     {
         settings.inputFolder = RawInputDefault;
         settings.satelliteOutputFolder = PngInputDefault;
+        settings.outputFolder = TerrainAssetsDefault;
+        settings.rootObjectName = TerrainRootDefault;
+        settings.replaceExistingRoot = true;
     }
 
     private static void AddLog(string message)

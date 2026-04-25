@@ -195,7 +195,7 @@ public static class TerrainTileImporter
 
         plane.transform.position = new Vector3(
             centerX,
-            config.terrainOrigin.y,
+            config.waterPlaneElevation,
             centerZ);
         plane.transform.localScale = new Vector3(width / 10f, 1f, depth / 10f);
 
@@ -328,12 +328,6 @@ public static class TerrainTileImporter
         var existing = GameObject.Find(config.rootObjectName);
         if (existing != null)
         {
-            if (!config.replaceExistingRoot)
-            {
-                throw new InvalidOperationException(
-                    $"A GameObject named '{config.rootObjectName}' already exists. Rename it or enable Replace Existing Root.");
-            }
-
             UnityEngine.Object.DestroyImmediate(existing);
         }
 

@@ -47,6 +47,7 @@ public class TerrainForgeWorkflowSettings : ScriptableSingleton<TerrainForgeWork
     public string rootObjectName = "TerrainTileRoot";
     public bool replaceExistingRoot = true;
     public bool createWaterPlane;
+    public float waterPlaneElevation;
     public Material waterMaterial;
 
     [Header("GeoTIFF Export")]
@@ -104,6 +105,7 @@ public class TerrainForgeWorkflowSettings : ScriptableSingleton<TerrainForgeWork
         rootObjectName = config.rootObjectName;
         replaceExistingRoot = config.replaceExistingRoot;
         createWaterPlane = config.createWaterPlane;
+        waterPlaneElevation = config.waterPlaneElevation;
         waterMaterial = config.waterMaterial;
         geoTiffPath = config.geoTiffPath;
         satelliteGeoTiffPath = config.satelliteGeoTiffPath;
@@ -151,6 +153,7 @@ public class TerrainForgeWorkflowSettings : ScriptableSingleton<TerrainForgeWork
         config.rootObjectName = rootObjectName;
         config.replaceExistingRoot = replaceExistingRoot;
         config.createWaterPlane = createWaterPlane;
+        config.waterPlaneElevation = waterPlaneElevation;
         config.waterMaterial = waterMaterial;
         config.geoTiffPath = geoTiffPath;
         config.satelliteGeoTiffPath = satelliteGeoTiffPath;

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
@@ -16,6 +17,8 @@ public static class TerrainForgerGisDataUtility
     private const string SatAssetPath = "Assets/Terrain/SAT";
     private const int DefaultDemPreviewSize = 512;
     private const int MapboxMaxStaticImageSize = 1280;
+    private const int GoogleMapsDefaultTileSize = 256;
+    private const int GoogleMapsMaxZoomLevel = 22;
     private const string DemDownloadProgressTitle = "TerrainForger DEM Download";
     private const string SatDownloadProgressTitle = "TerrainForger Satellite Download";
 
@@ -114,6 +117,9 @@ public static class TerrainForgerGisDataUtility
             case TerrainDataProviderIds.Mapbox:
                 DownloadMapboxSatellite(settings);
                 return;
+            case TerrainDataProviderIds.GoogleMapsPlatform:
+                DownloadGoogleMapsSatellite(settings);
+                return;
             default:
                 throw new InvalidOperationException($"Unsupported imagery provider id: {settings.imageryProviderId}");
         }
@@ -156,6 +162,64 @@ public static class TerrainForgerGisDataUtility
             };
         }
 
+        if (string.Equals(settings.imageryProviderId, TerrainDataProviderIds.GoogleMapsPlatform, StringComparison.OrdinalIgnoreCase))
+        {
+            var centerLatitude = (north + south) * 0.5d;
+            var desiredMetersPerPixel = 1d / pixelsPerMeter;
+            var zoomLevel = ResolveGoogleZoomLevel(desiredMetersPerPixel, centerLatitude);
+            var actualMetersPerPixel = ResolveGoogleMetersPerPixel(centerLatitude, zoomLevel);
+            var actualPixelsPerMeter = 1d / actualMetersPerPixel;
+            var googleTileSize = ResolveProviderMaxTileSize(settings.imageryProviderId);
+            var tilesPerAxis = 1 << zoomLevel;
+            var firstTileX = Mathf.Clamp((int)Math.Floor(LongitudeToTileX(west, zoomLevel)), 0, tilesPerAxis - 1);
+            var lastTileX = Mathf.Clamp((int)Math.Floor(LongitudeToTileX(east, zoomLevel) - 1e-9d), 0, tilesPerAxis - 1);
+            var firstTileY = Mathf.Clamp((int)Math.Floor(LatitudeToTileY(north, zoomLevel)), 0, tilesPerAxis - 1);
+            var lastTileY = Mathf.Clamp((int)Math.Floor(LatitudeToTileY(south, zoomLevel) - 1e-9d), 0, tilesPerAxis - 1);
+            var googleTilesX = Mathf.Max(1, lastTileX - firstTileX + 1);
+            var googleTilesY = Mathf.Max(1, lastTileY - firstTileY + 1);
+            var googleTotalWidthPixels = googleTilesX * googleTileSize;
+            var googleTotalHeightPixels = googleTilesY * googleTileSize;
+            var googleTotalTiles = googleTilesX * googleTilesY;
+            var googleWarningMessage = $"Google Maps uses zoom level {zoomLevel} for this request, which yields approximately {actualMetersPerPixel:0.####} m/px at the map center.";
+
+            if (googleTotalTiles > 1)
+            {
+                googleWarningMessage = $"{googleWarningMessage} The download will use a {googleTilesX} x {googleTilesY} mosaic ({googleTotalTiles} tiles).";
+            }
+
+            if (googleTotalTiles > 64)
+            {
+                googleWarningMessage = $"{googleWarningMessage} Large request: {googleTotalTiles} tiles may take a while and consume significant provider quota.";
+            }
+
+            return new TerrainForgerSatelliteDownloadPlan
+            {
+                isValid = true,
+                providerId = settings.imageryProviderId,
+                widthMeters = widthMeters,
+                heightMeters = heightMeters,
+                pixelsPerMeter = actualPixelsPerMeter,
+                metersPerPixel = actualMetersPerPixel,
+                totalWidthPixels = googleTotalWidthPixels,
+                totalHeightPixels = googleTotalHeightPixels,
+                maxTileSize = googleTileSize,
+                tilesX = googleTilesX,
+                tilesY = googleTilesY,
+                totalTiles = googleTotalTiles,
+                maxTileWidthPixels = googleTileSize,
+                maxTileHeightPixels = googleTileSize,
+                requiresTiling = googleTotalTiles > 1,
+                zoomLevel = zoomLevel,
+                tilePixelWidth = googleTileSize,
+                tilePixelHeight = googleTileSize,
+                firstTileX = firstTileX,
+                lastTileX = lastTileX,
+                firstTileY = firstTileY,
+                lastTileY = lastTileY,
+                warningMessage = googleWarningMessage
+            };
+        }
+
         var totalWidthPixels = Mathf.Max(1, Mathf.CeilToInt((float)(widthMeters * pixelsPerMeter)));
         var totalHeightPixels = Mathf.Max(1, Mathf.CeilToInt((float)(heightMeters * pixelsPerMeter)));
         var maxTileSize = ResolveProviderMaxTileSize(settings.imageryProviderId);
@@ -193,6 +257,9 @@ public static class TerrainForgerGisDataUtility
             maxTileWidthPixels = maxTileWidthPixels,
             maxTileHeightPixels = maxTileHeightPixels,
             requiresTiling = totalTiles > 1,
+            zoomLevel = -1,
+            tilePixelWidth = maxTileWidthPixels,
+            tilePixelHeight = maxTileHeightPixels,
             warningMessage = warningMessage
         };
     }
@@ -453,6 +520,92 @@ public static class TerrainForgerGisDataUtility
         }
     }
 
+    private static void DownloadGoogleMapsSatellite(TerrainForgeWorkflowSettings settings)
+    {
+        var apiKey = TerrainDataServiceSettings.instance.GoogleMapsApiKey;
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            throw new InvalidOperationException("Google Maps API key is not configured in Terrain Data Services.");
+        }
+
+        var plan = BuildSatelliteDownloadPlan(settings);
+        if (!plan.isValid)
+        {
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(plan.warningMessage)
+                ? "Unable to build a valid satellite download plan."
+                : plan.warningMessage);
+        }
+
+        var session = CreateGoogleMapsSatelliteSession(apiKey);
+        var west = settings.westBound.ToDecimalDegrees();
+        var south = settings.southBound.ToDecimalDegrees();
+        var east = settings.eastBound.ToDecimalDegrees();
+        var north = settings.northBound.ToDecimalDegrees();
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"terrainforger_google_tiles_{Guid.NewGuid():N}");
+        var outputFileName = $"sat_google_{DateTime.Now:yyyyMMdd_HHmmss}.tif";
+        var outputAssetPath = CombineAssetPath(SatAssetPath, outputFileName);
+        var outputFullPath = ToAbsoluteProjectPath(outputAssetPath);
+        var previousSatelliteImagePath = settings.lastSatelliteImagePath;
+
+        try
+        {
+            Directory.CreateDirectory(tempRoot);
+            DownloadAndWarpGoogleTiles(apiKey, session, plan, tempRoot, outputFullPath, west, south, east, north);
+            DeletePreviousSatelliteImages(previousSatelliteImagePath);
+
+            settings.satelliteGeoTiffPath = outputAssetPath;
+            settings.lastSatelliteImagePath = outputAssetPath;
+            AssetDatabase.Refresh();
+            settings.SaveSettings();
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, true);
+            }
+        }
+    }
+
+    private static TerrainForgerGoogleMapsSessionResponse CreateGoogleMapsSatelliteSession(string apiKey)
+    {
+        var request = new TerrainForgerGoogleMapsSessionRequest
+        {
+            mapType = "satellite",
+            language = ResolveGoogleMapsLanguage(),
+            region = ResolveGoogleMapsRegion(),
+            imageFormat = "png"
+        };
+
+        var responseJson = UploadJson(
+            $"https://tile.googleapis.com/v1/createSession?key={Uri.EscapeDataString(apiKey)}",
+            JsonUtility.ToJson(request));
+        var response = JsonUtility.FromJson<TerrainForgerGoogleMapsSessionResponse>(responseJson);
+        if (response == null || string.IsNullOrWhiteSpace(response.session))
+        {
+            throw new InvalidOperationException("Google Maps session request did not return a valid session token.");
+        }
+
+        if (response.tileWidth <= 0)
+        {
+            response.tileWidth = GoogleMapsDefaultTileSize;
+        }
+
+        if (response.tileHeight <= 0)
+        {
+            response.tileHeight = response.tileWidth;
+        }
+
+        if (string.IsNullOrWhiteSpace(response.imageFormat))
+        {
+            response.imageFormat = "png";
+        }
+
+        return response;
+    }
+
     private static string ResolveQgisExecutable(string executableName)
     {
         var qgisInstallFolder = TerrainDataServiceSettings.instance.QgisInstallFolder;
@@ -471,7 +624,7 @@ public static class TerrainForgerGisDataUtility
         return executablePath;
     }
 
-    private static void GeoreferenceAndWarpMapboxImage(
+    private static void GeoreferenceAndWarpWebMercatorImage(
         string inputImagePath,
         string tempMercatorPath,
         string outputGeoTiffPath,
@@ -638,6 +791,17 @@ public static class TerrainForgerGisDataUtility
         Debug.Log($"[TerrainForger GIS] Saved data to {absoluteOutputPath}");
     }
 
+    private static string UploadJson(string url, string jsonBody)
+    {
+        using (var client = new WebClient())
+        {
+            client.Encoding = Encoding.UTF8;
+            client.Headers.Add(HttpRequestHeader.UserAgent, "TerrainForger/1.0");
+            client.Headers[HttpRequestHeader.ContentType] = "application/json";
+            return client.UploadString(url, "POST", jsonBody);
+        }
+    }
+
     private static void EnsureTerrainFolders()
     {
         Directory.CreateDirectory(ToAbsoluteProjectPath(TerrainRootAssetPath));
@@ -736,7 +900,7 @@ public static class TerrainForgerGisDataUtility
                     SatDownloadProgressTitle,
                     $"Georeferencing tile {currentTileNumber} of {plan.totalTiles}...",
                     Mathf.Lerp(0.1f, 0.8f, progressStart + (0.5f / Math.Max(1, plan.totalTiles))));
-                GeoreferenceAndWarpMapboxImage(
+                GeoreferenceAndWarpWebMercatorImage(
                     tempImagePath,
                     tempMercatorPath,
                     tempGeoTiffPath,
@@ -756,21 +920,102 @@ public static class TerrainForgerGisDataUtility
             return;
         }
 
-        var vrtPath = Path.Combine(tempRoot, "mapbox_satellite.vrt");
+        BuildGeoTiffMosaic(tempRoot, "mapbox_satellite.vrt", tileGeoTiffs, outputGeoTiffPath, west, south, east, north);
+    }
+
+    private static void DownloadAndWarpGoogleTiles(
+        string apiKey,
+        TerrainForgerGoogleMapsSessionResponse session,
+        TerrainForgerSatelliteDownloadPlan plan,
+        string tempRoot,
+        string outputGeoTiffPath,
+        double west,
+        double south,
+        double east,
+        double north)
+    {
+        var tileGeoTiffs = new string[plan.totalTiles];
+        var tileIndex = 0;
+
+        for (var tileY = plan.firstTileY; tileY <= plan.lastTileY; tileY++)
+        {
+            for (var tileX = plan.firstTileX; tileX <= plan.lastTileX; tileX++)
+            {
+                var currentTileNumber = tileIndex + 1;
+                var progressStart = tileIndex / (float)Math.Max(1, plan.totalTiles);
+                var url =
+                    $"https://tile.googleapis.com/v1/2dtiles/{plan.zoomLevel}/{tileX}/{tileY}" +
+                    $"?session={Uri.EscapeDataString(session.session)}" +
+                    $"&key={Uri.EscapeDataString(apiKey)}";
+
+                var tempImagePath = Path.Combine(tempRoot, $"tile_{tileY}_{tileX}.{session.imageFormat}");
+                var tempMercatorPath = Path.Combine(tempRoot, $"tile_{tileY}_{tileX}_mercator.tif");
+                var tempGeoTiffPath = Path.Combine(tempRoot, $"tile_{tileY}_{tileX}.tif");
+                var tileWest = TileXToLongitude(tileX, plan.zoomLevel);
+                var tileEast = TileXToLongitude(tileX + 1d, plan.zoomLevel);
+                var tileNorth = TileYToLatitude(tileY, plan.zoomLevel);
+                var tileSouth = TileYToLatitude(tileY + 1d, plan.zoomLevel);
+
+                EditorUtility.DisplayProgressBar(
+                    SatDownloadProgressTitle,
+                    $"Downloading tile {currentTileNumber} of {plan.totalTiles}...",
+                    Mathf.Lerp(0.05f, 0.65f, progressStart));
+                DownloadToFile(url, tempImagePath);
+
+                EditorUtility.DisplayProgressBar(
+                    SatDownloadProgressTitle,
+                    $"Georeferencing tile {currentTileNumber} of {plan.totalTiles}...",
+                    Mathf.Lerp(0.1f, 0.8f, progressStart + (0.5f / Math.Max(1, plan.totalTiles))));
+                GeoreferenceAndWarpWebMercatorImage(
+                    tempImagePath,
+                    tempMercatorPath,
+                    tempGeoTiffPath,
+                    tileWest,
+                    tileSouth,
+                    tileEast,
+                    tileNorth);
+
+                tileGeoTiffs[tileIndex++] = tempGeoTiffPath;
+            }
+        }
+
+        BuildGeoTiffMosaic(tempRoot, "google_satellite.vrt", tileGeoTiffs, outputGeoTiffPath, west, south, east, north);
+    }
+
+    private static void BuildGeoTiffMosaic(
+        string tempRoot,
+        string vrtFileName,
+        string[] tileGeoTiffs,
+        string outputGeoTiffPath,
+        double west,
+        double south,
+        double east,
+        double north)
+    {
+        var vrtPath = Path.Combine(tempRoot, vrtFileName);
         var buildVrtPath = ResolveQgisExecutable("gdalbuildvrt.exe");
-        var gdalTranslatePath = ResolveQgisExecutable("gdal_translate.exe");
+        var gdalWarpPath = ResolveQgisExecutable("gdalwarp.exe");
         EditorUtility.DisplayProgressBar(SatDownloadProgressTitle, "Building satellite mosaic...", 0.9f);
         var vrtArgs = $"{Quote(vrtPath)} {string.Join(" ", tileGeoTiffs.Select(Quote))}";
         RunProcess(buildVrtPath, vrtArgs);
 
         EditorUtility.DisplayProgressBar(SatDownloadProgressTitle, "Writing final satellite GeoTIFF...", 0.97f);
-        var translateArgs = string.Join(" ", new[]
+        var warpArgs = string.Join(" ", new[]
         {
+            "-overwrite",
+            "-r bilinear",
+            "-t_srs EPSG:4326",
+            "-te_srs EPSG:4326",
+            "-te",
+            FormatDouble(west),
+            FormatDouble(south),
+            FormatDouble(east),
+            FormatDouble(north),
             "-of GTiff",
             Quote(vrtPath),
             Quote(outputGeoTiffPath)
         });
-        RunProcess(gdalTranslatePath, translateArgs);
+        RunProcess(gdalWarpPath, warpArgs);
     }
 
     private static int ResolveProviderMaxTileSize(string providerId)
@@ -779,6 +1024,8 @@ public static class TerrainForgerGisDataUtility
         {
             case TerrainDataProviderIds.Mapbox:
                 return MapboxMaxStaticImageSize;
+            case TerrainDataProviderIds.GoogleMapsPlatform:
+                return GoogleMapsDefaultTileSize;
             default:
                 return MapboxMaxStaticImageSize;
         }
@@ -849,5 +1096,69 @@ public static class TerrainForgerGisDataUtility
     {
         const double earthRadius = 6378137d;
         return (2d * Math.Atan(Math.Exp(y / earthRadius)) - (Math.PI * 0.5d)) * Mathf.Rad2Deg;
+    }
+
+    private static string ResolveGoogleMapsLanguage()
+    {
+        var cultureName = CultureInfo.CurrentUICulture?.Name;
+        return string.IsNullOrWhiteSpace(cultureName) ? "en-US" : cultureName;
+    }
+
+    private static string ResolveGoogleMapsRegion()
+    {
+        try
+        {
+            var regionName = RegionInfo.CurrentRegion?.TwoLetterISORegionName;
+            if (!string.IsNullOrWhiteSpace(regionName))
+            {
+                return regionName.ToUpperInvariant();
+            }
+        }
+        catch
+        {
+        }
+
+        return "US";
+    }
+
+    private static int ResolveGoogleZoomLevel(double desiredMetersPerPixel, double latitude)
+    {
+        var safeMetersPerPixel = Math.Max(0.000001d, desiredMetersPerPixel);
+        var baseResolution = ResolveGoogleMetersPerPixel(latitude, 0);
+        var zoom = (int)Math.Ceiling(Math.Log(baseResolution / safeMetersPerPixel, 2d));
+        return Mathf.Clamp(zoom, 0, GoogleMapsMaxZoomLevel);
+    }
+
+    private static double ResolveGoogleMetersPerPixel(double latitude, int zoomLevel)
+    {
+        var latitudeRadians = Mathf.Deg2Rad * Mathf.Clamp((float)latitude, -85.05112878f, 85.05112878f);
+        return 156543.03392804097d * Math.Cos(latitudeRadians) / Math.Pow(2d, zoomLevel);
+    }
+
+    private static double LongitudeToTileX(double longitude, int zoomLevel)
+    {
+        var tileCount = Math.Pow(2d, zoomLevel);
+        return ((longitude + 180d) / 360d) * tileCount;
+    }
+
+    private static double LatitudeToTileY(double latitude, int zoomLevel)
+    {
+        var clampedLatitude = Mathf.Clamp((float)latitude, -85.05112878f, 85.05112878f) * Mathf.Deg2Rad;
+        var tileCount = Math.Pow(2d, zoomLevel);
+        var mercator = Math.Log(Math.Tan(clampedLatitude) + (1d / Math.Cos(clampedLatitude)));
+        return (1d - (mercator / Math.PI)) * 0.5d * tileCount;
+    }
+
+    private static double TileXToLongitude(double tileX, int zoomLevel)
+    {
+        var tileCount = Math.Pow(2d, zoomLevel);
+        return (tileX / tileCount) * 360d - 180d;
+    }
+
+    private static double TileYToLatitude(double tileY, int zoomLevel)
+    {
+        var tileCount = Math.Pow(2d, zoomLevel);
+        var mercator = Math.PI * (1d - (2d * tileY / tileCount));
+        return Mathf.Rad2Deg * (float)Math.Atan(Math.Sinh(mercator));
     }
 }

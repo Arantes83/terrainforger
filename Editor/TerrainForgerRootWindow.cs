@@ -47,7 +47,8 @@ public class TerrainForgerRootWindow : EditorWindow
     {
         var settings = TerrainDataServiceSettings.instance;
         return !string.IsNullOrWhiteSpace(settings.OpenTopographyApiKey) &&
-               !string.IsNullOrWhiteSpace(settings.MapboxAccessToken) &&
+               (!string.IsNullOrWhiteSpace(settings.MapboxAccessToken) ||
+                !string.IsNullOrWhiteSpace(settings.GoogleMapsApiKey)) &&
                !string.IsNullOrWhiteSpace(settings.QgisInstallFolder);
     }
 
@@ -59,7 +60,7 @@ public class TerrainForgerRootWindow : EditorWindow
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
             EditorGUILayout.LabelField("Service Settings", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("OpenTopography is used for DEM downloads, Mapbox is used for satellite imagery, and QGIS/GDAL is used for raster bounds, previews, cropping, reprojection, and export.", MessageType.None);
+            EditorGUILayout.HelpBox("OpenTopography is used for DEM downloads, Mapbox or Google Maps Platform can be used for satellite imagery, and QGIS/GDAL is used for raster bounds, previews, cropping, reprojection, and export.", MessageType.None);
             if (GUILayout.Button(new GUIContent("Open Service Settings", "Configure OpenTopography, Mapbox, Google Maps Platform and QGIS/GDAL paths."), GUILayout.Height(28f)))
             {
                 TerrainDataServiceSettingsProvider.OpenSettings();

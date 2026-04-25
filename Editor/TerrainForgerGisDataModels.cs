@@ -44,5 +44,31 @@ public struct TerrainForgerSatelliteDownloadPlan
     public int maxTileWidthPixels;
     public int maxTileHeightPixels;
     public bool requiresTiling;
+    public int zoomLevel;
+    public int tilePixelWidth;
+    public int tilePixelHeight;
+    public int firstTileX;
+    public int lastTileX;
+    public int firstTileY;
+    public int lastTileY;
     public string warningMessage;
+}
+
+[System.Serializable]
+public class TerrainForgerGoogleMapsSessionRequest
+{
+    public string mapType;
+    public string language;
+    public string region;
+    public string imageFormat;
+}
+
+[System.Serializable]
+public class TerrainForgerGoogleMapsSessionResponse
+{
+    public string session;
+    public string expiry;
+    public int tileWidth;
+    public int tileHeight;
+    public string imageFormat;
 }

@@ -39,6 +39,8 @@ public class TerrainTileImportConfig : ScriptableObject
     public string rootObjectName = "TerrainTileRoot";
     public bool replaceExistingRoot = true;
     public bool createWaterPlane;
+    [Tooltip("World-space Y altitude used when TerrainForger creates a water plane after import.")]
+    public float waterPlaneElevation;
     public Material waterMaterial;
 
     [Header("GeoTIFF Export")]

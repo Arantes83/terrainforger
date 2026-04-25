@@ -26,9 +26,9 @@ It provides a controlled pipeline for:
 The current integrated workflow uses:
 
 - `OpenTopography` for DEM downloads
-- `Mapbox` for satellite downloads
+- `Mapbox` or `Google Maps Platform` for satellite downloads
 
-The Data Services panel also exposes `Google Maps Platform` credentials, but the current integrated acquisition workflow does not use Google downloads directly.
+Google Maps Platform satellite downloads use the official Map Tiles API session flow and remain subject to Google Maps Platform quota, attribution, and storage restrictions.
 
 ## Generated Folders
 

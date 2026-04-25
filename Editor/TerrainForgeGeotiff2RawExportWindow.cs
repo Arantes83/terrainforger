@@ -22,7 +22,7 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
     public static void Open()
     {
         var window = GetWindow<TerrainForgeGeotiff2RawExportWindow>("Geotiff2Raw Export");
-        window.minSize = new Vector2(760f, 620f);
+        window.minSize = new Vector2(980f, 620f);
         window.Show();
         window.Focus();
     }
@@ -44,98 +44,109 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
             "TerrainForger: Geotiff2Raw Export",
             "Preview the DEM cut lines, then export DEM tiles as RAW 16-bit and satellite tiles as PNG using the same rows, columns and tile names.");
 
-        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+        using (new EditorGUILayout.HorizontalScope())
         {
-            EditorGUILayout.LabelField("Source And Output", EditorStyles.boldLabel);
-            settings.geoTiffPath = EditorGUILayout.TextField("DEM GeoTIFF", settings.geoTiffPath);
-            if (GUILayout.Button("Browse DEM GeoTIFF"))
+            using (new EditorGUILayout.VerticalScope(GUILayout.ExpandWidth(true)))
             {
-                BrowseGeoTiff(ref settings.geoTiffPath, "Select DEM GeoTIFF");
-            }
-
-            settings.satelliteGeoTiffPath = EditorGUILayout.TextField("Satellite GeoTIFF", settings.satelliteGeoTiffPath);
-            if (GUILayout.Button("Browse Satellite GeoTIFF"))
-            {
-                BrowseGeoTiff(ref settings.satelliteGeoTiffPath, "Select Satellite GeoTIFF");
-            }
-
-            settings.inputFolder = EditorGUILayout.TextField("RAW Output Folder", settings.inputFolder);
-            settings.satelliteOutputFolder = EditorGUILayout.TextField("PNG Output Folder", settings.satelliteOutputFolder);
-            settings.writeExportManifest = EditorGUILayout.Toggle("Write Export Manifest", settings.writeExportManifest);
-        }
-
-        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-        {
-            EditorGUILayout.LabelField("Tile Layout", EditorStyles.boldLabel);
-            settings.rows = DrawStepperField("Rows", settings.rows, 1, 128);
-            settings.cols = DrawStepperField("Columns", settings.cols, 1, 128);
-            settings.heightmapResolution = DrawResolutionPopup(
-                "Heightmap Resolution",
-                settings.heightmapResolution,
-                HeightmapResolutionOptions);
-            settings.satelliteTileResolution = DrawResolutionPopup(
-                "Satellite Tile Resolution",
-                settings.satelliteTileResolution,
-                SatelliteResolutionOptions);
-            settings.filePattern = EditorGUILayout.TextField("File Pattern", settings.filePattern);
-            EditorGUILayout.HelpBox(
-                "The DEM elevation range is detected automatically from the source raster during export and stored for the next import step.",
-                MessageType.None);
-        }
-
-        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-        {
-            EditorGUILayout.LabelField("Coastline Mask", EditorStyles.boldLabel);
-            settings.exportUseGshhgMask = EditorGUILayout.Toggle("Use Coastline Land Mask", settings.exportUseGshhgMask);
-            using (new EditorGUI.DisabledScope(!settings.exportUseGshhgMask))
-            {
-                settings.coastlineDataSource = DrawCoastlineSourcePopup("Coastline Source", settings.coastlineDataSource);
-
-                if (settings.coastlineDataSource == TerrainForgerCoastlineDataSource.Gshhg)
+                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
                 {
-                    settings.gshhgResolutionMode = (TerrainForgerGshhgResolutionMode)EditorGUILayout.EnumPopup("GSHHG Resolution", settings.gshhgResolutionMode);
+                    EditorGUILayout.LabelField("Source And Output", EditorStyles.boldLabel);
+                    settings.geoTiffPath = EditorGUILayout.TextField(new GUIContent("DEM GeoTIFF", "Source DEM GeoTIFF used for RAW tile export."), settings.geoTiffPath);
+                    if (GUILayout.Button(new GUIContent("Browse DEM GeoTIFF", "Choose the DEM GeoTIFF that TerrainForger should split into RAW tiles.")))
+                    {
+                        BrowseGeoTiff(ref settings.geoTiffPath, "Select DEM GeoTIFF");
+                    }
+
+                    settings.satelliteGeoTiffPath = EditorGUILayout.TextField(new GUIContent("Satellite GeoTIFF", "Source satellite GeoTIFF used for PNG tile export."), settings.satelliteGeoTiffPath);
+                    if (GUILayout.Button(new GUIContent("Browse Satellite GeoTIFF", "Choose the satellite GeoTIFF that TerrainForger should split into PNG tiles.")))
+                    {
+                        BrowseGeoTiff(ref settings.satelliteGeoTiffPath, "Select Satellite GeoTIFF");
+                    }
+
+                    settings.inputFolder = EditorGUILayout.TextField(new GUIContent("RAW Output Folder", "Folder where TerrainForger writes exported RAW terrain tiles."), settings.inputFolder);
+                    settings.satelliteOutputFolder = EditorGUILayout.TextField(new GUIContent("PNG Output Folder", "Folder where TerrainForger writes exported PNG satellite tiles."), settings.satelliteOutputFolder);
+                    settings.writeExportManifest = EditorGUILayout.Toggle(new GUIContent("Write Export Manifest", "Write a text manifest with export settings and bounds next to the generated tiles."), settings.writeExportManifest);
                 }
 
-                settings.exportWaterMaskElevation = EditorGUILayout.FloatField("Water Elevation", settings.exportWaterMaskElevation);
+                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                {
+                    EditorGUILayout.LabelField("Tile Layout", EditorStyles.boldLabel);
+                    settings.rows = DrawStepperField("Rows", settings.rows, 1, 128, "Number of terrain rows to export from the source raster.");
+                    settings.cols = DrawStepperField("Columns", settings.cols, 1, 128, "Number of terrain columns to export from the source raster.");
+                    settings.heightmapResolution = DrawResolutionPopup(
+                        "Heightmap Resolution",
+                        settings.heightmapResolution,
+                        HeightmapResolutionOptions,
+                        "Unity heightmap resolution used for each exported RAW tile.");
+                    settings.satelliteTileResolution = DrawResolutionPopup(
+                        "Satellite Tile Resolution",
+                        settings.satelliteTileResolution,
+                        SatelliteResolutionOptions,
+                        "Texture resolution used for each exported PNG satellite tile.");
+                    settings.filePattern = EditorGUILayout.TextField(new GUIContent("File Pattern", "Naming pattern used for exported RAW files. Example: {tile}.raw"), settings.filePattern);
+                    EditorGUILayout.HelpBox(
+                        "The DEM elevation range is detected automatically from the source raster during export and stored for the next import step.",
+                        MessageType.None);
+                }
+
+                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                {
+                    EditorGUILayout.LabelField("Coastline Mask", EditorStyles.boldLabel);
+                    settings.exportUseGshhgMask = EditorGUILayout.Toggle(new GUIContent("Use Coastline Land Mask", "Replace DEM samples outside the selected land mask with the configured water elevation."), settings.exportUseGshhgMask);
+                    using (new EditorGUI.DisabledScope(!settings.exportUseGshhgMask))
+                    {
+                        settings.coastlineDataSource = DrawCoastlineSourcePopup("Coastline Source", settings.coastlineDataSource);
+
+                        if (settings.coastlineDataSource == TerrainForgerCoastlineDataSource.Gshhg)
+                        {
+                            settings.gshhgResolutionMode = (TerrainForgerGshhgResolutionMode)EditorGUILayout.EnumPopup(new GUIContent("GSHHG Resolution", "Resolution level TerrainForger should use when selecting the GSHHG shoreline dataset."), settings.gshhgResolutionMode);
+                        }
+
+                        settings.exportWaterMaskElevation = EditorGUILayout.FloatField(new GUIContent("Water Elevation", "Elevation assigned to DEM samples outside the selected coastline land mask."), settings.exportWaterMaskElevation);
+                    }
+                    var coastlineHelp = settings.coastlineDataSource == TerrainForgerCoastlineDataSource.Gshhg
+                        ? "Use GSHHG land polygons to define the shoreline. TerrainForger auto-downloads the official dataset and, in Auto mode, picks the best resolution for the current region. Samples outside the land mask are exported at the configured water elevation, which avoids clipping the coastline from DEM altitude alone."
+                        : "Use OpenStreetMap-derived land polygons to define the shoreline. TerrainForger auto-downloads the processed OSM land polygons in WGS84. This option can better match edited or recent coastlines, while still masking the DEM by land polygons instead of clipping by elevation.";
+                    EditorGUILayout.HelpBox(coastlineHelp, MessageType.None);
+                }
+
+                settings.SaveSettings();
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button(new GUIContent("Reveal RAW Folder", "Open the folder where TerrainForger writes RAW height tiles.")))
+                    {
+                        TerrainForgeWindowUtility.RevealFolder(settings.inputFolder, "RAW Folder Missing");
+                    }
+
+                    if (GUILayout.Button(new GUIContent("Reveal PNG Folder", "Open the folder where TerrainForger writes PNG satellite tiles.")))
+                    {
+                        TerrainForgeWindowUtility.RevealFolder(settings.satelliteOutputFolder, "PNG Folder Missing");
+                    }
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button(new GUIContent("Export DEM Tiles", "Export the active DEM GeoTIFF into RAW terrain tiles."), GUILayout.Height(28f)))
+                    {
+                        RunExport(settings, TerrainGeoTiffExporter.ExportToRawTiles, "DEM Export Complete", "DEM GeoTIFF exported to RAW tiles successfully.");
+                    }
+
+                    if (GUILayout.Button(new GUIContent("Export SAT Tiles", "Export the active satellite GeoTIFF into PNG terrain textures."), GUILayout.Height(28f)))
+                    {
+                        RunExport(settings, TerrainGeoTiffExporter.ExportSatelliteTiles, "Satellite Export Complete", "Satellite GeoTIFF exported to PNG tiles successfully.");
+                    }
+
+                    if (GUILayout.Button(new GUIContent("Export Both", "Export both DEM RAW tiles and satellite PNG tiles using the current layout."), GUILayout.Height(28f)))
+                    {
+                        RunExport(settings, TerrainGeoTiffExporter.ExportTerrainPackage, "Export Complete", "DEM and satellite tiles exported successfully.");
+                    }
+                }
             }
-            var coastlineHelp = settings.coastlineDataSource == TerrainForgerCoastlineDataSource.Gshhg
-                ? "Use GSHHG land polygons to define the shoreline. TerrainForger auto-downloads the official dataset and, in Auto mode, picks the best resolution for the current region. Samples outside the land mask are exported at the configured water elevation, which avoids clipping the coastline from DEM altitude alone."
-                : "Use OpenStreetMap-derived land polygons to define the shoreline. TerrainForger auto-downloads the processed OSM land polygons in WGS84. This option can better match edited or recent coastlines, while still masking the DEM by land polygons instead of clipping by elevation.";
-            EditorGUILayout.HelpBox(coastlineHelp, MessageType.None);
-        }
 
-        DrawPreviewSection(settings);
-
-        settings.SaveSettings();
-
-        using (new EditorGUILayout.HorizontalScope())
-        {
-            if (GUILayout.Button("Reveal RAW Folder"))
+            using (new EditorGUILayout.VerticalScope(GUILayout.Width(360f)))
             {
-                TerrainForgeWindowUtility.RevealFolder(settings.inputFolder, "RAW Folder Missing");
-            }
-
-            if (GUILayout.Button("Reveal PNG Folder"))
-            {
-                TerrainForgeWindowUtility.RevealFolder(settings.satelliteOutputFolder, "PNG Folder Missing");
-            }
-        }
-
-        using (new EditorGUILayout.HorizontalScope())
-        {
-            if (GUILayout.Button("Export DEM Tiles", GUILayout.Height(28f)))
-            {
-                RunExport(settings, TerrainGeoTiffExporter.ExportToRawTiles, "DEM Export Complete", "DEM GeoTIFF exported to RAW tiles successfully.");
-            }
-
-            if (GUILayout.Button("Export SAT Tiles", GUILayout.Height(28f)))
-            {
-                RunExport(settings, TerrainGeoTiffExporter.ExportSatelliteTiles, "Satellite Export Complete", "Satellite GeoTIFF exported to PNG tiles successfully.");
-            }
-
-            if (GUILayout.Button("Export Both", GUILayout.Height(28f)))
-            {
-                RunExport(settings, TerrainGeoTiffExporter.ExportTerrainPackage, "Export Complete", "DEM and satellite tiles exported successfully.");
+                DrawPreviewSection(settings);
             }
         }
 
@@ -157,12 +168,12 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
             {
                 using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(settings.geoTiffPath)))
                 {
-                    if (GUILayout.Button("Load DEM Preview"))
+                    if (GUILayout.Button(new GUIContent("Load DEM Preview", "Generate a DEM preview with the current grid overlay.")))
                     {
                         TryLoadPreview(settings.geoTiffPath);
                     }
 
-                    if (GUILayout.Button("Refresh Preview"))
+                    if (GUILayout.Button(new GUIContent("Refresh Preview", "Regenerate the DEM preview texture from disk.")))
                     {
                         TryLoadPreview(settings.geoTiffPath, forceRefresh: true);
                     }
@@ -170,7 +181,7 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
 
                 using (new EditorGUI.DisabledScope(demGridPreviewTexture == null))
                 {
-                    if (GUILayout.Button("Clear Preview"))
+                    if (GUILayout.Button(new GUIContent("Clear Preview", "Release the DEM preview texture from memory.")))
                     {
                         ReleasePreviewTexture();
                         demGridPreviewStatus = "DEM preview cleared.";
@@ -196,7 +207,7 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
         }
     }
 
-    private static int DrawResolutionPopup(string label, int currentValue, int[] options)
+    private static int DrawResolutionPopup(string label, int currentValue, int[] options, string tooltip)
     {
         var labels = new string[options.Length];
         var selectedIndex = 0;
@@ -210,24 +221,24 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
             }
         }
 
-        selectedIndex = EditorGUILayout.Popup(label, selectedIndex, labels);
+        selectedIndex = EditorGUILayout.Popup(new GUIContent(label, tooltip), selectedIndex, labels);
         return options[Mathf.Clamp(selectedIndex, 0, options.Length - 1)];
     }
 
-    private static int DrawStepperField(string label, int currentValue, int minValue, int maxValue)
+    private static int DrawStepperField(string label, int currentValue, int minValue, int maxValue, string tooltip)
     {
         using (new EditorGUILayout.HorizontalScope())
         {
-            EditorGUILayout.PrefixLabel(label);
+            EditorGUILayout.PrefixLabel(new GUIContent(label, tooltip));
 
-            if (GUILayout.Button("<", GUILayout.Width(28f)))
+            if (GUILayout.Button(new GUIContent("<", $"Decrease {label.ToLowerInvariant()} by one."), GUILayout.Width(28f)))
             {
                 currentValue = Mathf.Max(minValue, currentValue - 1);
             }
 
             GUILayout.Label(currentValue.ToString(), EditorStyles.centeredGreyMiniLabel, GUILayout.Width(48f));
 
-            if (GUILayout.Button(">", GUILayout.Width(28f)))
+            if (GUILayout.Button(new GUIContent(">", $"Increase {label.ToLowerInvariant()} by one."), GUILayout.Width(28f)))
             {
                 currentValue = Mathf.Min(maxValue, currentValue + 1);
             }
@@ -376,7 +387,7 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
     {
         var options = new[] { "GSHHG", "OpenStreetMap" };
         var selectedIndex = currentValue == TerrainForgerCoastlineDataSource.OpenStreetMap ? 1 : 0;
-        selectedIndex = EditorGUILayout.Popup(label, selectedIndex, options);
+        selectedIndex = EditorGUILayout.Popup(new GUIContent(label, "Choose which shoreline dataset TerrainForger should use when masking exported DEM tiles."), selectedIndex, options);
         return selectedIndex == 1 ? TerrainForgerCoastlineDataSource.OpenStreetMap : TerrainForgerCoastlineDataSource.Gshhg;
     }
 

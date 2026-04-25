@@ -14,14 +14,14 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
     private Texture2D satellitePreviewTexture;
     private string satellitePreviewSourcePath = string.Empty;
     private string satellitePreviewStatus = "No satellite preview loaded.";
-    private bool showBounds = true;
+    private bool showBounds;
     private static readonly System.Collections.Generic.List<string> workflowLog = new System.Collections.Generic.List<string>();
 
     [MenuItem("TerrainForger/Get GIS Data")]
     public static void Open()
     {
         var window = GetWindow<TerrainForgeDownloadGeoDataWindow>("Get GIS Data");
-        window.minSize = new Vector2(620f, 520f);
+        window.minSize = new Vector2(980f, 560f);
         window.Show();
         window.Focus();
     }
@@ -49,171 +49,189 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
         var serializedObject = new SerializedObject(settings);
         serializedObject.Update();
 
-        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-        {
-            EditorGUILayout.LabelField("Local Source", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox(
-                "Choose a local source file here. Use 'Store Source' to copy it into Assets/Terrain, and 'Refill Bounds From Source' only when you want to sync the bounds back from the selected file.",
-                MessageType.None);
-            TerrainForgeWindowUtility.DrawProperty(serializedObject, "localSourceType", "Source Type", "Defines whether the local source is a georeferenced GeoTIFF DEM or a KAP chart/raster. When a source is selected, TerrainForger uses its exact bounds for DEM and SAT downloads.");
-            TerrainForgeWindowUtility.DrawProperty(serializedObject, "localSourcePath", "Source File", "Absolute or project-relative path to the source raster whose geospatial extent must drive the download bounds.");
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                if (GUILayout.Button("Browse Source File"))
-                {
-                    BrowseLocalSource(settings);
-                }
-
-                if (GUILayout.Button("Store Source"))
-                {
-                    RunStoreLocalSource(settings);
-                }
-
-                if (GUILayout.Button("Refill Bounds From Source"))
-                {
-                    RunRefillBoundsFromSource(settings);
-                }
-            }
-        }
-
-        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-        {
-            EditorGUILayout.LabelField("Providers", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox(
-                "Only providers that are already configured and currently supported by this tool appear in the dropdowns below.",
-                MessageType.None);
-
-            var demProviders = TerrainForgeWindowUtility.GetConfiguredProviders(
-                supportsElevation: true,
-                supportsImagery: false,
-                TerrainDataProviderIds.OpenTopography);
-            if (demProviders.Length == 0)
-            {
-                EditorGUILayout.HelpBox("No DEM providers are configured. Add credentials in Service Settings.", MessageType.Warning);
-                settings.demProviderId = string.Empty;
-            }
-            else
-            {
-                var selectedDemIndex = TerrainForgeWindowUtility.DrawConfiguredProviderPopup("DEM Provider", demProviders, settings.demProviderId);
-                settings.demProviderId = demProviders[selectedDemIndex].providerId;
-            }
-
-            var imageryProviders = TerrainForgeWindowUtility.GetConfiguredProviders(
-                supportsElevation: false,
-                supportsImagery: true,
-                TerrainDataProviderIds.Mapbox);
-            if (imageryProviders.Length == 0)
-            {
-                EditorGUILayout.HelpBox("No imagery providers are configured. Add credentials in Service Settings.", MessageType.Warning);
-                settings.imageryProviderId = string.Empty;
-            }
-            else
-            {
-                var selectedImageryIndex = TerrainForgeWindowUtility.DrawConfiguredProviderPopup("Satellite Provider", imageryProviders, settings.imageryProviderId);
-                settings.imageryProviderId = imageryProviders[selectedImageryIndex].providerId;
-            }
-
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Satellite Resolution", EditorStyles.boldLabel);
-            settings.satelliteResolution = EditorGUILayout.FloatField(new GUIContent("Resolution", "Desired satellite raster resolution. Meters per pixel preserves GIS scale; pixels per meter increases detail and file size."), settings.satelliteResolution);
-            settings.satelliteResolution = Mathf.Max(0.0001f, settings.satelliteResolution);
-            settings.satelliteResolutionUnit = (TerrainForgerSatelliteResolutionUnit)EditorGUILayout.EnumPopup(new GUIContent("Unit", "How the satellite resolution value is interpreted for the computed download plan."), settings.satelliteResolutionUnit);
-
-            var plan = TerrainForgerGisDataUtility.BuildSatelliteDownloadPlan(settings);
-            if (plan.isValid)
-            {
-                EditorGUILayout.LabelField("Map Size", $"{plan.widthMeters:0.##} m x {plan.heightMeters:0.##} m");
-                EditorGUILayout.LabelField("Computed Resolution", $"{plan.pixelsPerMeter:0.####} px/m ({plan.metersPerPixel:0.####} m/px)");
-                EditorGUILayout.LabelField("Output Raster", $"{plan.totalWidthPixels} x {plan.totalHeightPixels} px");
-                EditorGUILayout.LabelField("Provider Limit", $"{plan.maxTileSize} px per tile");
-                EditorGUILayout.LabelField("Tile Plan", $"{plan.tilesX} x {plan.tilesY} ({plan.totalTiles} tiles, max {plan.maxTileWidthPixels} x {plan.maxTileHeightPixels} px each)");
-
-                if (!string.IsNullOrWhiteSpace(plan.warningMessage))
-                {
-                    EditorGUILayout.HelpBox(plan.warningMessage, MessageType.Warning);
-                }
-            }
-            else if (!string.IsNullOrWhiteSpace(plan.warningMessage))
-            {
-                EditorGUILayout.HelpBox(plan.warningMessage, MessageType.Warning);
-            }
-        }
-
-        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-        {
-            showBounds = EditorGUILayout.Foldout(showBounds, usingSourceBounds ? "Map Bounds (locked to Source File)" : "Map Bounds", true);
-            if (usingSourceBounds)
-            {
-                EditorGUILayout.HelpBox("A source file is selected. TerrainForger locks manual map bounds and uses the exact geospatial extent read from the source for DEM and SAT downloads.", MessageType.Info);
-            }
-            using (new EditorGUI.DisabledScope(usingSourceBounds))
-            if (showBounds)
-            {
-                settings.northBound = TerrainForgeWindowUtility.DrawLatitudeDdmField("North Bound", settings.northBound);
-                settings.southBound = TerrainForgeWindowUtility.DrawLatitudeDdmField("South Bound", settings.southBound);
-                settings.westBound = TerrainForgeWindowUtility.DrawLongitudeDdmField("West Bound", settings.westBound);
-                settings.eastBound = TerrainForgeWindowUtility.DrawLongitudeDdmField("East Bound", settings.eastBound);
-            }
-        }
-
         using (new EditorGUILayout.HorizontalScope())
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.MinWidth(260f), GUILayout.MaxWidth(360f)))
+            using (new EditorGUILayout.VerticalScope(GUILayout.ExpandWidth(true)))
             {
-                DrawSourcePreviewSection(settings);
-            }
-
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.MinWidth(260f), GUILayout.MaxWidth(360f)))
-            {
-                DrawDemPreviewSection(settings);
-            }
-
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.MinWidth(260f), GUILayout.MaxWidth(360f)))
-            {
-                DrawSatellitePreviewSection(settings);
-            }
-        }
-
-        serializedObject.ApplyModifiedProperties();
-        settings.SaveSettings();
-
-        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-        {
-            EditorGUILayout.LabelField("Storage", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField("DEM Folder", "Assets/Terrain/GeoTIFF");
-            EditorGUILayout.LabelField("Satellite Folder", "Assets/Terrain/SAT");
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                if (GUILayout.Button("Reveal DEM Folder"))
+                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
                 {
-                    TerrainForgeWindowUtility.RevealFolder("Assets/Terrain/GeoTIFF", "DEM Folder Missing");
+                    EditorGUILayout.LabelField("Local Source", EditorStyles.boldLabel);
+                    EditorGUILayout.HelpBox(
+                        "Choose a local source file here. Use 'Store Source' to copy it into Assets/Terrain, and 'Refill Bounds From Source' only when you want to sync the bounds back from the selected file.",
+                        MessageType.None);
+                    TerrainForgeWindowUtility.DrawProperty(serializedObject, "localSourceType", "Source Type", "Defines whether the local source is a georeferenced GeoTIFF DEM or a KAP chart/raster. When a source is selected, TerrainForger uses its exact bounds for DEM and SAT downloads.");
+                    TerrainForgeWindowUtility.DrawProperty(serializedObject, "localSourcePath", "Source File", "Absolute or project-relative path to the source raster whose geospatial extent must drive the download bounds.");
+
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        if (GUILayout.Button(new GUIContent("Browse Source File", "Choose a local GeoTIFF or KAP file and immediately refill the map bounds from it.")))
+                        {
+                            BrowseLocalSource(settings);
+                        }
+
+                        if (GUILayout.Button(new GUIContent("Store Source", "Copy the selected source file into Assets/Terrain so it becomes part of the Unity project workspace.")))
+                        {
+                            RunStoreLocalSource(settings);
+                        }
+
+                        if (GUILayout.Button(new GUIContent("Refill Bounds From Source", "Read the selected source file bounds again and overwrite the current manual map bounds.")))
+                        {
+                            RunRefillBoundsFromSource(settings);
+                        }
+                    }
                 }
 
-                if (GUILayout.Button("Reveal SAT Folder"))
+                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
                 {
-                    TerrainForgeWindowUtility.RevealFolder("Assets/Terrain/SAT", "SAT Folder Missing");
+                    EditorGUILayout.LabelField("Providers", EditorStyles.boldLabel);
+                    EditorGUILayout.HelpBox(
+                        "Only providers that are already configured and currently supported by this tool appear in the dropdowns below.",
+                        MessageType.None);
+
+                    var demProviders = TerrainForgeWindowUtility.GetConfiguredProviders(
+                        supportsElevation: true,
+                        supportsImagery: false,
+                        TerrainDataProviderIds.OpenTopography);
+                    if (demProviders.Length == 0)
+                    {
+                        EditorGUILayout.HelpBox("No DEM providers are configured. Add credentials in Service Settings.", MessageType.Warning);
+                        settings.demProviderId = string.Empty;
+                    }
+                    else
+                    {
+                        var selectedDemIndex = TerrainForgeWindowUtility.DrawConfiguredProviderPopup("DEM Provider", demProviders, settings.demProviderId);
+                        settings.demProviderId = demProviders[selectedDemIndex].providerId;
+                    }
+
+                    var imageryProviders = TerrainForgeWindowUtility.GetConfiguredProviders(
+                        supportsElevation: false,
+                        supportsImagery: true,
+                        TerrainDataProviderIds.Mapbox,
+                        TerrainDataProviderIds.GoogleMapsPlatform);
+                    if (imageryProviders.Length == 0)
+                    {
+                        EditorGUILayout.HelpBox("No imagery providers are configured. Add credentials in Service Settings.", MessageType.Warning);
+                        settings.imageryProviderId = string.Empty;
+                    }
+                    else
+                    {
+                        var selectedImageryIndex = TerrainForgeWindowUtility.DrawConfiguredProviderPopup("Satellite Provider", imageryProviders, settings.imageryProviderId);
+                        settings.imageryProviderId = imageryProviders[selectedImageryIndex].providerId;
+                    }
+
+                    EditorGUILayout.Space();
+                    EditorGUILayout.LabelField(new GUIContent("Satellite Resolution", "Controls the target imagery detail used to build the satellite download plan."), EditorStyles.boldLabel);
+                    settings.satelliteResolution = EditorGUILayout.FloatField(new GUIContent("Resolution", "Desired satellite raster resolution. Meters per pixel preserves GIS scale; pixels per meter increases detail and file size."), settings.satelliteResolution);
+                    settings.satelliteResolution = Mathf.Max(0.0001f, settings.satelliteResolution);
+                    settings.satelliteResolutionUnit = (TerrainForgerSatelliteResolutionUnit)EditorGUILayout.EnumPopup(new GUIContent("Unit", "How the satellite resolution value is interpreted for the computed download plan."), settings.satelliteResolutionUnit);
+
+                    var plan = TerrainForgerGisDataUtility.BuildSatelliteDownloadPlan(settings);
+                    if (plan.isValid)
+                    {
+                        EditorGUILayout.LabelField("Map Size", $"{plan.widthMeters:0.##} m x {plan.heightMeters:0.##} m");
+                        EditorGUILayout.LabelField("Computed Resolution", $"{plan.pixelsPerMeter:0.####} px/m ({plan.metersPerPixel:0.####} m/px)");
+                        EditorGUILayout.LabelField("Output Raster", $"{plan.totalWidthPixels} x {plan.totalHeightPixels} px");
+                        EditorGUILayout.LabelField("Provider Limit", $"{plan.maxTileSize} px per tile");
+                        EditorGUILayout.LabelField("Tile Plan", $"{plan.tilesX} x {plan.tilesY} ({plan.totalTiles} tiles, max {plan.maxTileWidthPixels} x {plan.maxTileHeightPixels} px each)");
+
+                        if (plan.zoomLevel >= 0)
+                        {
+                            EditorGUILayout.LabelField("Zoom Level", plan.zoomLevel.ToString());
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(plan.warningMessage))
+                        {
+                            EditorGUILayout.HelpBox(plan.warningMessage, MessageType.Warning);
+                        }
+                    }
+                    else if (!string.IsNullOrWhiteSpace(plan.warningMessage))
+                    {
+                        EditorGUILayout.HelpBox(plan.warningMessage, MessageType.Warning);
+                    }
+                }
+
+                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                {
+                    showBounds = EditorGUILayout.Foldout(showBounds, new GUIContent(usingSourceBounds ? "Map Bounds (locked to Source File)" : "Map Bounds", "Open this section to manually edit the map bounds used by DEM and satellite downloads."), true);
+                    if (usingSourceBounds)
+                    {
+                        EditorGUILayout.HelpBox("A source file is selected. TerrainForger locks manual map bounds and uses the exact geospatial extent read from the source for DEM and SAT downloads.", MessageType.Info);
+                    }
+
+                    if (showBounds)
+                    {
+                        using (new EditorGUI.DisabledScope(usingSourceBounds))
+                        {
+                            settings.northBound = TerrainForgeWindowUtility.DrawLatitudeDdmField("North Bound", settings.northBound);
+                            settings.southBound = TerrainForgeWindowUtility.DrawLatitudeDdmField("South Bound", settings.southBound);
+                            settings.westBound = TerrainForgeWindowUtility.DrawLongitudeDdmField("West Bound", settings.westBound);
+                            settings.eastBound = TerrainForgeWindowUtility.DrawLongitudeDdmField("East Bound", settings.eastBound);
+                        }
+                    }
+                }
+
+                serializedObject.ApplyModifiedProperties();
+                settings.SaveSettings();
+
+                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                {
+                    EditorGUILayout.LabelField("Storage", EditorStyles.boldLabel);
+                    EditorGUILayout.LabelField("DEM Folder", "Assets/Terrain/GeoTIFF");
+                    EditorGUILayout.LabelField("Satellite Folder", "Assets/Terrain/SAT");
+
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        if (GUILayout.Button(new GUIContent("Reveal DEM Folder", "Open the project folder that stores DEM GeoTIFF files.")))
+                        {
+                            TerrainForgeWindowUtility.RevealFolder("Assets/Terrain/GeoTIFF", "DEM Folder Missing");
+                        }
+
+                        if (GUILayout.Button(new GUIContent("Reveal SAT Folder", "Open the project folder that stores downloaded satellite GeoTIFF files.")))
+                        {
+                            TerrainForgeWindowUtility.RevealFolder("Assets/Terrain/SAT", "SAT Folder Missing");
+                        }
+                    }
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button(new GUIContent("Download DEM", "Download a DEM GeoTIFF using the active bounds. If a source file is selected, its bounds are refilled immediately before the request.")))
+                    {
+                        RunDownloadDem(settings);
+                    }
+
+                    if (GUILayout.Button(new GUIContent("Download Satellite", "Download satellite imagery using the active bounds. If a source file is selected, its bounds are refilled immediately before the request.")))
+                    {
+                        RunDownloadSatellite(settings);
+                    }
+                }
+
+                if (GUILayout.Button(new GUIContent("Get Selected GIS Data", "Run the complete configured DEM and satellite download workflow."), GUILayout.Height(32f)))
+                {
+                    RunDownloadAll(settings);
                 }
             }
-        }
 
-        using (new EditorGUILayout.HorizontalScope())
-        {
-            if (GUILayout.Button(new GUIContent("Download DEM", "Download a DEM GeoTIFF using the active bounds. If a source file is selected, its bounds are refilled immediately before the request.")))
+            using (new EditorGUILayout.VerticalScope(GUILayout.Width(720f)))
             {
-                RunDownloadDem(settings);
-            }
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Width(230f)))
+                    {
+                        DrawSourcePreviewSection(settings);
+                    }
 
-            if (GUILayout.Button(new GUIContent("Download Satellite", "Download satellite imagery using the active bounds. If a source file is selected, its bounds are refilled immediately before the request.")))
-            {
-                RunDownloadSatellite(settings);
-            }
-        }
+                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Width(230f)))
+                    {
+                        DrawDemPreviewSection(settings);
+                    }
 
-        if (GUILayout.Button(new GUIContent("Get Selected GIS Data", "Run the complete configured DEM and satellite download workflow."), GUILayout.Height(32f)))
-        {
-            RunDownloadAll(settings);
+                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Width(230f)))
+                    {
+                        DrawSatellitePreviewSection(settings);
+                    }
+                }
+            }
         }
 
         DrawWorkflowLog();
@@ -235,12 +253,12 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
         {
             using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(previewSource)))
             {
-                if (GUILayout.Button("Load Preview"))
+                if (GUILayout.Button(new GUIContent("Load Preview", "Generate a preview texture from the current DEM GeoTIFF.")))
                 {
                     TryLoadDemPreview(previewSource);
                 }
 
-                if (GUILayout.Button("Refresh Preview"))
+                if (GUILayout.Button(new GUIContent("Refresh Preview", "Regenerate the DEM preview texture from disk.")))
                 {
                     TryLoadDemPreview(previewSource, forceRefresh: true);
                 }
@@ -248,7 +266,7 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
 
             using (new EditorGUI.DisabledScope(demPreviewTexture == null))
             {
-                if (GUILayout.Button("Clear Preview"))
+                if (GUILayout.Button(new GUIContent("Clear Preview", "Release the DEM preview texture from memory.")))
                 {
                     ReleasePreviewTexture();
                     demPreviewStatus = "DEM preview cleared.";
@@ -282,12 +300,12 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
         {
             using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(previewSource)))
             {
-                if (GUILayout.Button("Load Preview"))
+                if (GUILayout.Button(new GUIContent("Load Preview", "Generate a preview texture from the selected local source file.")))
                 {
                     TryLoadSourcePreview(previewSource);
                 }
 
-                if (GUILayout.Button("Refresh Preview"))
+                if (GUILayout.Button(new GUIContent("Refresh Preview", "Regenerate the local source preview texture from disk.")))
                 {
                     TryLoadSourcePreview(previewSource, forceRefresh: true);
                 }
@@ -295,7 +313,7 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
 
             using (new EditorGUI.DisabledScope(sourcePreviewTexture == null))
             {
-                if (GUILayout.Button("Clear Preview"))
+                if (GUILayout.Button(new GUIContent("Clear Preview", "Release the source preview texture from memory.")))
                 {
                     ReleaseSourcePreviewTexture();
                     sourcePreviewStatus = "Source preview cleared.";
@@ -329,12 +347,12 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
         {
             using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(previewSource)))
             {
-                if (GUILayout.Button("Load Preview"))
+                if (GUILayout.Button(new GUIContent("Load Preview", "Generate a preview texture from the current satellite GeoTIFF.")))
                 {
                     TryLoadSatellitePreview(previewSource);
                 }
 
-                if (GUILayout.Button("Refresh Preview"))
+                if (GUILayout.Button(new GUIContent("Refresh Preview", "Regenerate the satellite preview texture from disk.")))
                 {
                     TryLoadSatellitePreview(previewSource, forceRefresh: true);
                 }
@@ -342,7 +360,7 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
 
             using (new EditorGUI.DisabledScope(satellitePreviewTexture == null))
             {
-                if (GUILayout.Button("Clear Preview"))
+                if (GUILayout.Button(new GUIContent("Clear Preview", "Release the satellite preview texture from memory.")))
                 {
                     ReleaseSatellitePreviewTexture();
                     satellitePreviewStatus = "Satellite preview cleared.";
