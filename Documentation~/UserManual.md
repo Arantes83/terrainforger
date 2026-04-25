@@ -214,7 +214,7 @@ Each module supports a specific stage of the GIS -> Unity workflow.
 Supported pipeline:
 
 ```text
-Get GIS Data
+-> Get GIS Data
 -> Geotiff2Raw Export
 -> Import Tiles
 -> Validate Terrain Scale
