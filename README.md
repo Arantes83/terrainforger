@@ -17,7 +17,7 @@ TerrainForger is a Unity Editor package for GIS-driven terrain workflows. It hel
 The current supported menu flow is:
 
 ```text
-TerrainForger/Get GIS Data
+-> TerrainForger/Get GIS Data
 -> TerrainForger/Geotiff2Raw Export
 -> TerrainForger/Import Tiles
 ```
@@ -120,10 +120,7 @@ Direct credential pages:
 
 ## Credential Safety
 
-- API keys are not hardcoded in the package.
 - Credentials are stored locally in the consuming project's `UserSettings/TerrainDataServiceSettings.asset`.
-- `UserSettings/` is ignored by the repository, so those values are not distributed with the package by default.
-- For distributed editor workflows, prefer client-safe keys and restrict them on the provider side.
 
 ## Documentation
 
