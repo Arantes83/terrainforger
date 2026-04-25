@@ -34,14 +34,11 @@ Main goals:
 
 TerrainForger is recommended for:
 
-* Military simulation environments
 * Professional simulators
 * Training systems
-* Geographic visualization
 * Open world terrain generation
 * Large-scale terrain reconstruction
 * Real-world terrain replication
-* Defense and institutional simulation projects
 
 ---
 
