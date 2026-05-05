@@ -9,6 +9,7 @@ TerrainForger is a Unity Editor package for GIS-driven terrain workflows. It hel
 ## Package
 
 - Package name: `com.arantes83.terrainforger`
+- Package version: `0.1.1`
 - Unity version declared in the package: `2020.3`
 - Package type: editor-only
 
@@ -56,14 +57,14 @@ External requirements:
 
 ## Installation
 
-### Git URL
+### Git URL (current main)
 
 Add the package to `Packages/manifest.json`:
 
 ```json
 {
   "dependencies": {
-    "com.arantes83.terrainforger": "https://github.com/Arantes83/terrainforger.git"
+    "com.arantes83.terrainforger": "https://github.com/Arantes83/terrainforger.git#main"
   }
 }
 ```
@@ -73,7 +74,40 @@ Add the package to `Packages/manifest.json`:
 Open `Window > Package Manager`, choose `Add package from git URL...`, and paste:
 
 ```text
-https://github.com/Arantes83/terrainforger.git
+https://github.com/Arantes83/terrainforger.git#main
+```
+
+### Pinned Releases
+
+For reproducible projects, install a release tag that matches the package version declared in `package.json`:
+
+```text
+https://github.com/Arantes83/terrainforger.git#vX.Y.Z
+```
+
+Replace `vX.Y.Z` with the release tag you want to lock in the Unity project.
+
+### GitHub Release Archive
+
+GitHub release archives for this package should include only the files required by the Unity addon:
+
+```text
+package.json
+package.json.meta
+Editor.meta
+Editor/
+LICENSE
+LICENSE.meta
+```
+
+Recommended documentation files for public releases:
+
+```text
+README.md
+README.md.meta
+CHANGELOG.md
+CHANGELOG.md.meta
+Documentation~/
 ```
 
 ### Local Development

@@ -18,6 +18,7 @@
 Assets/Terrain/
 Assets/Generated/
 dist/
+dist.meta
 
 # OS files
 .DS_Store

@@ -1,6 +1,12 @@
 # Changelog
 
-## 2026-05-05
+## 0.1.1 - 2026-05-05
+
+### Release / Packaging
+
+- Updated the Unity package metadata to version `0.1.1`.
+- Documented Git URL, pinned release tag, and minimal GitHub release archive installation paths in `README.md`.
+- Excluded `dist/` release archives and their Unity `.meta` file from source control because they are generated package artifacts.
 
 ### Stability / Reliability
 
