@@ -44,7 +44,8 @@ Assets/
     |-- OSMCoastline/
     |-- PNG/
     |-- Raw/
-    `-- SAT/
+    |-- SAT/
+    `-- Source/
 ```
 
 ## Credential Safety

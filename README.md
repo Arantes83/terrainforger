@@ -33,6 +33,14 @@ The current supported menu flow is:
 - Import tiled RAW terrain data into Unity Terrain assets
 - Configure the generated water plane altitude during tile import
 
+## Reliability Safeguards
+
+- External QGIS/GDAL operations are guarded with process timeouts and non-blocking stdout/stderr capture to prevent editor hangs.
+- Satellite download plans are capped before execution to avoid runaway tile counts, integer overflow, excessive provider quota use, and memory spikes.
+- Terrain import uses a compact single-layer alphamap when applying satellite textures, reducing memory pressure on large tile grids.
+- Tool settings are saved only after actual UI changes instead of on every editor repaint.
+- Auto-downloaded coastline datasets are extracted with path validation so archives cannot write outside the terrain data cache.
+
 ## Dependencies
 
 Required Unity modules:
@@ -86,13 +94,15 @@ Assets/
     |-- OSMCoastline/
     |-- PNG/
     |-- Raw/
-    `-- SAT/
+    |-- SAT/
+    `-- Source/
 ```
 
 Folder summary:
 
 - `Assets/Terrain/GeoTIFF`: source or downloaded DEM rasters
-- `Assets/Terrain/SAT`: source or downloaded satellite rasters
+- `Assets/Terrain/SAT`: downloaded satellite rasters
+- `Assets/Terrain/Source`: stored local source files used for bounds and previews
 - `Assets/Terrain/Raw`: exported RAW heightmap tiles
 - `Assets/Terrain/PNG`: exported satellite PNG tiles
 - `Assets/Terrain/GSHHG`: auto-downloaded GSHHG shoreline dataset

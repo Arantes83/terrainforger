@@ -9,6 +9,7 @@ public static class TerrainTileImporter
 {
     private const string SupportedResolutionList = "33, 65, 129, 257, 513, 1025, 2049, 4097";
     private const int SingleLayerAlphamapResolution = 16;
+    private const float GeneratedSatelliteLayerSmoothness = 0.08f;
 
     public readonly struct TerrainTileImportLayoutInfo
     {
@@ -257,7 +258,10 @@ public static class TerrainTileImporter
         {
             diffuseTexture = texture,
             tileSize = new Vector2(tileSizeX, tileSizeZ),
-            tileOffset = Vector2.zero
+            tileOffset = Vector2.zero,
+            metallic = 0f,
+            smoothness = GeneratedSatelliteLayerSmoothness,
+            specular = Color.black
         };
         AssetDatabase.CreateAsset(terrainLayer, terrainLayerAssetPath);
 

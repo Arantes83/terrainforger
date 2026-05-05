@@ -14,6 +14,7 @@ using Debug = UnityEngine.Debug;
 public static class TerrainForgerGisDataUtility
 {
     private const string TerrainRootAssetPath = "Assets/Terrain";
+    private const string SourceAssetPath = "Assets/Terrain/Source";
     private const string GeoTiffAssetPath = "Assets/Terrain/GeoTIFF";
     private const string SatAssetPath = "Assets/Terrain/SAT";
     private const int DefaultDemPreviewSize = 512;
@@ -47,10 +48,16 @@ public static class TerrainForgerGisDataUtility
         EnsureTerrainFolders();
         var destinationAssetPath = settings.localSourceType == TerrainForgerLocalSourceType.GeoTiff
             ? CombineAssetPath(GeoTiffAssetPath, Path.GetFileName(sourceFullPath))
-            : CombineAssetPath(SatAssetPath, Path.GetFileName(sourceFullPath));
+            : CombineAssetPath(SourceAssetPath, Path.GetFileName(sourceFullPath));
+        var legacySatelliteSourcePath = CombineAssetPath(SatAssetPath, Path.GetFileName(sourceFullPath));
 
         var destinationFullPath = ToAbsoluteProjectPath(destinationAssetPath);
-        File.Copy(sourceFullPath, destinationFullPath, true);
+        if (!PathsEqual(sourceFullPath, destinationFullPath))
+        {
+            File.Copy(sourceFullPath, destinationFullPath, true);
+        }
+
+        settings.localSourcePath = destinationAssetPath;
 
         if (settings.localSourceType == TerrainForgerLocalSourceType.GeoTiff)
         {
@@ -59,8 +66,19 @@ public static class TerrainForgerGisDataUtility
         }
         else
         {
-            settings.satelliteGeoTiffPath = destinationAssetPath;
-            settings.lastSatelliteImagePath = destinationAssetPath;
+            if (PathsReferToSameProjectFile(settings.satelliteGeoTiffPath, destinationAssetPath) ||
+                PathsReferToSameProjectFile(settings.satelliteGeoTiffPath, legacySatelliteSourcePath))
+            {
+                settings.satelliteGeoTiffPath = string.Empty;
+            }
+
+            if (PathsReferToSameProjectFile(settings.lastSatelliteImagePath, destinationAssetPath) ||
+                PathsReferToSameProjectFile(settings.lastSatelliteImagePath, legacySatelliteSourcePath))
+            {
+                settings.lastSatelliteImagePath = string.Empty;
+            }
+
+            DeleteMisplacedLocalSourceCopyIfPresent(legacySatelliteSourcePath);
         }
 
         AssetDatabase.Refresh();
@@ -885,6 +903,7 @@ public static class TerrainForgerGisDataUtility
     private static void EnsureTerrainFolders()
     {
         Directory.CreateDirectory(ToAbsoluteProjectPath(TerrainRootAssetPath));
+        Directory.CreateDirectory(ToAbsoluteProjectPath(SourceAssetPath));
         Directory.CreateDirectory(ToAbsoluteProjectPath(GeoTiffAssetPath));
         Directory.CreateDirectory(ToAbsoluteProjectPath(SatAssetPath));
         AssetDatabase.Refresh();
@@ -893,6 +912,44 @@ public static class TerrainForgerGisDataUtility
     private static string CombineAssetPath(string folderAssetPath, string fileName)
     {
         return $"{folderAssetPath.TrimEnd('/')}/{fileName}";
+    }
+
+    private static bool PathsReferToSameProjectFile(string firstPath, string secondPath)
+    {
+        if (string.IsNullOrWhiteSpace(firstPath) || string.IsNullOrWhiteSpace(secondPath))
+        {
+            return false;
+        }
+
+        return PathsEqual(ToAbsoluteProjectPath(firstPath), ToAbsoluteProjectPath(secondPath));
+    }
+
+    private static bool PathsEqual(string firstPath, string secondPath)
+    {
+        return string.Equals(
+            Path.GetFullPath(firstPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+            Path.GetFullPath(secondPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void DeleteMisplacedLocalSourceCopyIfPresent(string legacySatelliteSourcePath)
+    {
+        var extension = Path.GetExtension(legacySatelliteSourcePath);
+        if (!string.Equals(extension, ".kap", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var absolutePath = ToAbsoluteProjectPath(legacySatelliteSourcePath);
+        if (File.Exists(absolutePath))
+        {
+            File.Delete(absolutePath);
+            var metaPath = absolutePath + ".meta";
+            if (File.Exists(metaPath))
+            {
+                File.Delete(metaPath);
+            }
+        }
     }
 
     private static string ToAbsoluteProjectPath(string assetPath)

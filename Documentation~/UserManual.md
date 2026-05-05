@@ -158,15 +158,19 @@ Assets/
     |-- Raw/
     |   `-- Generated RAW 16-bit heightmap tiles
     |
-    `-- SAT/
-        `-- Source or downloaded satellite raster data
+    |-- SAT/
+    |   `-- Downloaded satellite raster data
+    |
+    `-- Source/
+        `-- Stored local source files used for bounds and previews
 ```
 
 Folder purpose:
 
 * `GSHHG/` stores the auto-downloaded GSHHG shoreline dataset
 * `GeoTIFF/` stores source geographic raster data
-* `SAT/` stores source or downloaded satellite rasters
+* `SAT/` stores downloaded satellite rasters
+* `Source/` stores local source files used for bounds and previews
 * `Raw/` stores exported RAW heightmaps for Unity Terrain
 * `PNG/` stores generated satellite image tiles
 * `OSMCoastline/` stores OpenStreetMap coastline support data

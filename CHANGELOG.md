@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-05-05
+
+### Stability / Reliability
+
+- Added timeouts and non-blocking stdout/stderr capture for QGIS/GDAL subprocesses to prevent editor hangs when external tools stall or emit large error output.
+- Added satellite download plan limits to reject oversized imagery requests before they can overflow counters, allocate excessive memory, or consume unexpected provider quota.
+- Added network timeouts for DEM, satellite, GSHHG, and OpenStreetMap coastline dataset downloads.
+
+### Import / Export
+
+- Reduced satellite texture import memory pressure by using a compact single-layer alphamap instead of matching the full terrain heightmap resolution.
+- Reduced gloss on generated terrain tile satellite layers by setting low smoothness, zero metallic, and black specular values.
+- Hardened coastline dataset ZIP extraction so downloaded archives cannot write outside the TerrainForger cache folder.
+
+### UI / UX
+
+- Updated `Get GIS Data`, `Geotiff2Raw Export`, and `Import Tiles` so workflow settings are saved only after real value changes instead of every editor repaint.
+- Stored local source files now go to `Assets/Terrain/Source` instead of `Assets/Terrain/SAT`, keeping the satellite preview focused on downloaded satellite GeoTIFFs.
+
 ## 2026-04-24
 
 ### UI / UX

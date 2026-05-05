@@ -524,7 +524,24 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
 
     private string GetSatellitePreviewSource(TerrainForgeWorkflowSettings settings)
     {
-        return string.IsNullOrWhiteSpace(settings.lastSatelliteImagePath) ? string.Empty : settings.lastSatelliteImagePath;
+        if (!IsSatellitePreviewFile(settings.lastSatelliteImagePath))
+        {
+            return string.Empty;
+        }
+
+        return settings.lastSatelliteImagePath;
+    }
+
+    private static bool IsSatellitePreviewFile(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        var extension = Path.GetExtension(path);
+        return string.Equals(extension, ".tif", System.StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(extension, ".tiff", System.StringComparison.OrdinalIgnoreCase);
     }
 
     private void TryLoadDemPreview(string previewSource, bool forceRefresh = false)
