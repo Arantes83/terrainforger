@@ -17,6 +17,7 @@
 # Generated terrain data and local caches
 Assets/Terrain/
 Assets/Generated/
+dist/
 
 # OS files
 .DS_Store

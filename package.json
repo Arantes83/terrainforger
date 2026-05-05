@@ -1,6 +1,6 @@
 {
   "name": "com.arantes83.terrainforger",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "displayName": "TerrainForger",
   "description": "Unity Editor package for GIS data download, GeoTIFF export, and terrain tile import workflows.",
   "unity": "2020.3",
