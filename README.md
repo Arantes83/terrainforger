@@ -100,16 +100,6 @@ LICENSE
 LICENSE.meta
 ```
 
-Recommended documentation files for public releases:
-
-```text
-README.md
-README.md.meta
-CHANGELOG.md
-CHANGELOG.md.meta
-Documentation~/
-```
-
 ### Local Development
 
 Use `Add package from disk...` and point Unity to this repository's `package.json`.
