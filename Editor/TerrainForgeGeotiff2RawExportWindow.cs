@@ -37,13 +37,14 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
         scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
 
         var settings = TerrainForgeWorkflowSettings.instance;
-        SyncDefaultSourcePaths(settings);
-        RefreshSourcePathsFromFolders(settings);
+        var sourcePathsChanged = SyncDefaultSourcePaths(settings);
+        sourcePathsChanged |= RefreshSourcePathsFromFolders(settings);
         TerrainForgeWindowUtility.DrawSettingsHeader(
             settings,
             "TerrainForger: Geotiff2Raw Export",
             "Preview the DEM cut lines, then export DEM tiles as RAW 16-bit and satellite tiles as PNG using the same rows, columns and tile names.");
 
+        EditorGUI.BeginChangeCheck();
         using (new EditorGUILayout.HorizontalScope())
         {
             using (new EditorGUILayout.VerticalScope(GUILayout.ExpandWidth(true)))
@@ -110,7 +111,10 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
                     EditorGUILayout.HelpBox(coastlineHelp, MessageType.None);
                 }
 
-                settings.SaveSettings();
+                if (EditorGUI.EndChangeCheck() || sourcePathsChanged)
+                {
+                    settings.SaveSettings();
+                }
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -247,40 +251,49 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
         return currentValue;
     }
 
-    private static void SyncDefaultSourcePaths(TerrainForgeWorkflowSettings settings)
+    private static bool SyncDefaultSourcePaths(TerrainForgeWorkflowSettings settings)
     {
+        var changed = false;
         if (string.IsNullOrWhiteSpace(settings.inputFolder) ||
             string.Equals(settings.inputFolder, "Assets/TerrainSource", StringComparison.OrdinalIgnoreCase))
         {
             settings.inputFolder = RawOutputDefault;
+            changed = true;
         }
 
         if (string.IsNullOrWhiteSpace(settings.satelliteOutputFolder) ||
             string.Equals(settings.satelliteOutputFolder, "Assets/TerrainTiles/SAT", StringComparison.OrdinalIgnoreCase))
         {
             settings.satelliteOutputFolder = PngOutputDefault;
+            changed = true;
         }
 
         if (string.IsNullOrWhiteSpace(settings.geoTiffPath) &&
             !string.IsNullOrWhiteSpace(settings.lastDemGeoTiffPath))
         {
             settings.geoTiffPath = settings.lastDemGeoTiffPath;
+            changed = true;
         }
 
         if (string.IsNullOrWhiteSpace(settings.satelliteGeoTiffPath) &&
             !string.IsNullOrWhiteSpace(settings.lastSatelliteImagePath))
         {
             settings.satelliteGeoTiffPath = settings.lastSatelliteImagePath;
+            changed = true;
         }
+
+        return changed;
     }
 
-    private static void RefreshSourcePathsFromFolders(TerrainForgeWorkflowSettings settings)
+    private static bool RefreshSourcePathsFromFolders(TerrainForgeWorkflowSettings settings)
     {
+        var changed = false;
         var latestDemPath = FindLatestGeoTiffAssetPath(DemGeoTiffFolder);
         if (ShouldReplaceSourcePath(settings.geoTiffPath, latestDemPath))
         {
             settings.geoTiffPath = latestDemPath;
             settings.lastDemGeoTiffPath = latestDemPath;
+            changed = true;
         }
 
         var latestSatellitePath = FindLatestGeoTiffAssetPath(SatelliteGeoTiffFolder);
@@ -288,7 +301,10 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
         {
             settings.satelliteGeoTiffPath = latestSatellitePath;
             settings.lastSatelliteImagePath = latestSatellitePath;
+            changed = true;
         }
+
+        return changed;
     }
 
     private static bool ShouldReplaceSourcePath(string currentAssetPath, string candidateAssetPath)

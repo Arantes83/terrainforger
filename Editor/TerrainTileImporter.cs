@@ -8,6 +8,7 @@ using UnityEngine;
 public static class TerrainTileImporter
 {
     private const string SupportedResolutionList = "33, 65, 129, 257, 513, 1025, 2049, 4097";
+    private const int SingleLayerAlphamapResolution = 16;
 
     public readonly struct TerrainTileImportLayoutInfo
     {
@@ -261,8 +262,8 @@ public static class TerrainTileImporter
         AssetDatabase.CreateAsset(terrainLayer, terrainLayerAssetPath);
 
         terrainData.terrainLayers = new[] { terrainLayer };
-        terrainData.alphamapResolution = Mathf.Clamp(entry.resolution, 16, 4096);
-        var alphamaps = new float[terrainData.alphamapResolution, terrainData.alphamapResolution, 1];
+        terrainData.alphamapResolution = SingleLayerAlphamapResolution;
+        var alphamaps = new float[SingleLayerAlphamapResolution, SingleLayerAlphamapResolution, 1];
         for (var y = 0; y < terrainData.alphamapResolution; y++)
         {
             for (var x = 0; x < terrainData.alphamapResolution; x++)

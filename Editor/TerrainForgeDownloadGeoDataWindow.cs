@@ -46,6 +46,7 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
         TerrainForgeWindowUtility.DrawPathButtons(settings, includeGeoTiffButton: false);
         var usingSourceBounds = HasUsableSourceFile(settings);
 
+        EditorGUI.BeginChangeCheck();
         var serializedObject = new SerializedObject(settings);
         serializedObject.Update();
 
@@ -170,8 +171,11 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
                     }
                 }
 
-                serializedObject.ApplyModifiedProperties();
-                settings.SaveSettings();
+                var serializedPropertiesChanged = serializedObject.ApplyModifiedProperties();
+                if (EditorGUI.EndChangeCheck() || serializedPropertiesChanged)
+                {
+                    settings.SaveSettings();
+                }
 
                 using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
                 {

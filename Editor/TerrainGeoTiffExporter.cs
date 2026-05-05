@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
@@ -24,6 +25,8 @@ public static class TerrainGeoTiffExporter
     private const string OsmLandPolygonsArchiveUrl = "https://osmdata.openstreetmap.de/download/land-polygons-split-4326.zip";
     private const string OsmLandPolygonsExtractedFolderName = "land-polygons-split-4326";
     private const string OsmLandPolygonsAssetCachePath = "Assets/Terrain/OSMCoastline";
+    private const int ExternalProcessTimeoutMilliseconds = 30 * 60 * 1000;
+    private const int NetworkTimeoutMilliseconds = 10 * 60 * 1000;
 
     public static void ExportToRawTiles(TerrainTileImportConfig config)
     {
@@ -496,6 +499,9 @@ public static class TerrainGeoTiffExporter
 
     private static void ExtractZipArchive(string archivePath, string destinationRoot)
     {
+        var destinationRootFullPath = Path.GetFullPath(destinationRoot)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
         using (var stream = File.OpenRead(archivePath))
         using (var archive = new ZipArchive(stream, ZipArchiveMode.Read))
         {
@@ -507,10 +513,10 @@ public static class TerrainGeoTiffExporter
                 }
 
                 var normalizedEntryPath = entry.FullName.Replace('/', Path.DirectorySeparatorChar);
-                var destinationPath = Path.GetFullPath(Path.Combine(destinationRoot, normalizedEntryPath));
-                if (!destinationPath.StartsWith(Path.GetFullPath(destinationRoot), StringComparison.OrdinalIgnoreCase))
+                var destinationPath = Path.GetFullPath(Path.Combine(destinationRootFullPath, normalizedEntryPath));
+                if (!destinationPath.StartsWith(destinationRootFullPath, StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new InvalidOperationException($"Unsafe path found in GSHHG archive: {entry.FullName}");
+                    throw new InvalidOperationException($"Unsafe path found in coastline archive: {entry.FullName}");
                 }
 
                 if (entry.FullName.EndsWith("/", StringComparison.Ordinal) ||
@@ -980,9 +986,49 @@ public static class TerrainGeoTiffExporter
                 throw new InvalidOperationException($"Failed to start {toolLabel}.");
             }
 
-            var stdout = process.StandardOutput.ReadToEnd();
-            var stderr = process.StandardError.ReadToEnd();
-            process.WaitForExit();
+            var stdout = new StringBuilder();
+            var stderr = new StringBuilder();
+
+            using (var outputWaitHandle = new AutoResetEvent(false))
+            using (var errorWaitHandle = new AutoResetEvent(false))
+            {
+                process.OutputDataReceived += (sender, args) =>
+                {
+                    if (args.Data == null)
+                    {
+                        outputWaitHandle.Set();
+                    }
+                    else
+                    {
+                        stdout.AppendLine(args.Data);
+                    }
+                };
+
+                process.ErrorDataReceived += (sender, args) =>
+                {
+                    if (args.Data == null)
+                    {
+                        errorWaitHandle.Set();
+                    }
+                    else
+                    {
+                        stderr.AppendLine(args.Data);
+                    }
+                };
+
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                if (!process.WaitForExit(ExternalProcessTimeoutMilliseconds))
+                {
+                    TryKillProcess(process);
+                    throw new TimeoutException(
+                        $"{toolLabel} timed out after {ExternalProcessTimeoutMilliseconds / 1000} seconds.\nCommand: {executable} {arguments}");
+                }
+
+                outputWaitHandle.WaitOne(5000);
+                errorWaitHandle.WaitOne(5000);
+            }
 
             if (process.ExitCode != 0)
             {
@@ -990,13 +1036,13 @@ public static class TerrainGeoTiffExporter
                     $"{toolLabel} failed with exit code {process.ExitCode}.\nCommand: {executable} {arguments}\n{stdout}\n{stderr}");
             }
 
-            return stdout;
+            return stdout.ToString();
         }
     }
 
     private static void DownloadFileWithUserAgent(string url, string absoluteOutputPath)
     {
-        using (var client = new WebClient())
+        using (var client = new TimeoutWebClient(NetworkTimeoutMilliseconds))
         {
             client.Headers.Add(HttpRequestHeader.UserAgent, "TerrainForger/1.0");
             client.DownloadFile(url, absoluteOutputPath);
@@ -1119,6 +1165,45 @@ public static class TerrainGeoTiffExporter
         }
 
         throw new InvalidOperationException("Unbalanced coordinate array in GDAL output.");
+    }
+
+    private static void TryKillProcess(Process process)
+    {
+        try
+        {
+            if (process != null && !process.HasExited)
+            {
+                process.Kill();
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private sealed class TimeoutWebClient : WebClient
+    {
+        private readonly int timeoutMilliseconds;
+
+        public TimeoutWebClient(int timeoutMilliseconds)
+        {
+            this.timeoutMilliseconds = timeoutMilliseconds;
+        }
+
+        protected override WebRequest GetWebRequest(Uri address)
+        {
+            var request = base.GetWebRequest(address);
+            if (request != null)
+            {
+                request.Timeout = timeoutMilliseconds;
+                if (request is HttpWebRequest httpRequest)
+                {
+                    httpRequest.ReadWriteTimeout = timeoutMilliseconds;
+                }
+            }
+
+            return request;
+        }
     }
 
     private readonly struct TileBounds

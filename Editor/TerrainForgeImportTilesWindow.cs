@@ -25,7 +25,7 @@ public class TerrainForgeImportTilesWindow : EditorWindow
         scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
 
         var settings = TerrainForgeWorkflowSettings.instance;
-        SyncImportDefaults(settings);
+        var importDefaultsChanged = SyncImportDefaults(settings);
 
         TerrainForgeWindowUtility.DrawSettingsHeader(
             settings,
@@ -41,6 +41,7 @@ public class TerrainForgeImportTilesWindow : EditorWindow
                 MessageType.None);
         }
 
+        EditorGUI.BeginChangeCheck();
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
             EditorGUILayout.LabelField("Water", EditorStyles.boldLabel);
@@ -59,7 +60,10 @@ public class TerrainForgeImportTilesWindow : EditorWindow
                 MessageType.None);
         }
 
-        settings.SaveSettings();
+        if (EditorGUI.EndChangeCheck() || importDefaultsChanged)
+        {
+            settings.SaveSettings();
+        }
 
         using (new EditorGUILayout.HorizontalScope())
         {
@@ -100,13 +104,32 @@ public class TerrainForgeImportTilesWindow : EditorWindow
         }
     }
 
-    private static void SyncImportDefaults(TerrainForgeWorkflowSettings settings)
+    private static bool SyncImportDefaults(TerrainForgeWorkflowSettings settings)
     {
-        settings.inputFolder = RawInputDefault;
-        settings.satelliteOutputFolder = PngInputDefault;
-        settings.outputFolder = TerrainAssetsDefault;
-        settings.rootObjectName = TerrainRootDefault;
-        settings.replaceExistingRoot = true;
+        var changed = false;
+        changed |= SetIfDifferent(ref settings.inputFolder, RawInputDefault);
+        changed |= SetIfDifferent(ref settings.satelliteOutputFolder, PngInputDefault);
+        changed |= SetIfDifferent(ref settings.outputFolder, TerrainAssetsDefault);
+        changed |= SetIfDifferent(ref settings.rootObjectName, TerrainRootDefault);
+
+        if (!settings.replaceExistingRoot)
+        {
+            settings.replaceExistingRoot = true;
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    private static bool SetIfDifferent(ref string currentValue, string newValue)
+    {
+        if (string.Equals(currentValue, newValue, System.StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        currentValue = newValue;
+        return true;
     }
 
     private static void AddLog(string message)

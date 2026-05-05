@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
@@ -19,6 +20,9 @@ public static class TerrainForgerGisDataUtility
     private const int MapboxMaxStaticImageSize = 1280;
     private const int GoogleMapsDefaultTileSize = 256;
     private const int GoogleMapsMaxZoomLevel = 22;
+    private const int MaxSatelliteDownloadTiles = 256;
+    private const int ExternalProcessTimeoutMilliseconds = 30 * 60 * 1000;
+    private const int NetworkTimeoutMilliseconds = 10 * 60 * 1000;
     private const string DemDownloadProgressTitle = "TerrainForger DEM Download";
     private const string SatDownloadProgressTitle = "TerrainForger Satellite Download";
 
@@ -175,11 +179,27 @@ public static class TerrainForgerGisDataUtility
             var lastTileX = Mathf.Clamp((int)Math.Floor(LongitudeToTileX(east, zoomLevel) - 1e-9d), 0, tilesPerAxis - 1);
             var firstTileY = Mathf.Clamp((int)Math.Floor(LatitudeToTileY(north, zoomLevel)), 0, tilesPerAxis - 1);
             var lastTileY = Mathf.Clamp((int)Math.Floor(LatitudeToTileY(south, zoomLevel) - 1e-9d), 0, tilesPerAxis - 1);
-            var googleTilesX = Mathf.Max(1, lastTileX - firstTileX + 1);
-            var googleTilesY = Mathf.Max(1, lastTileY - firstTileY + 1);
+            var googleTilesXLong = Math.Max(1L, (long)lastTileX - firstTileX + 1L);
+            var googleTilesYLong = Math.Max(1L, (long)lastTileY - firstTileY + 1L);
+            var googleTotalTilesLong = googleTilesXLong * googleTilesYLong;
+            if (googleTotalTilesLong > MaxSatelliteDownloadTiles ||
+                googleTilesXLong > int.MaxValue ||
+                googleTilesYLong > int.MaxValue ||
+                googleTilesXLong * googleTileSize > int.MaxValue ||
+                googleTilesYLong * googleTileSize > int.MaxValue)
+            {
+                return new TerrainForgerSatelliteDownloadPlan
+                {
+                    providerId = settings.imageryProviderId,
+                    warningMessage = $"Satellite request is too large for a single editor operation. Reduce the area or resolution so the request stays at or below {MaxSatelliteDownloadTiles} provider tiles."
+                };
+            }
+
+            var googleTilesX = (int)googleTilesXLong;
+            var googleTilesY = (int)googleTilesYLong;
             var googleTotalWidthPixels = googleTilesX * googleTileSize;
             var googleTotalHeightPixels = googleTilesY * googleTileSize;
-            var googleTotalTiles = googleTilesX * googleTilesY;
+            var googleTotalTiles = (int)googleTotalTilesLong;
             var googleWarningMessage = $"Google Maps uses zoom level {zoomLevel} for this request, which yields approximately {actualMetersPerPixel:0.####} m/px at the map center.";
 
             if (googleTotalTiles > 1)
@@ -220,14 +240,34 @@ public static class TerrainForgerGisDataUtility
             };
         }
 
-        var totalWidthPixels = Mathf.Max(1, Mathf.CeilToInt((float)(widthMeters * pixelsPerMeter)));
-        var totalHeightPixels = Mathf.Max(1, Mathf.CeilToInt((float)(heightMeters * pixelsPerMeter)));
+        if (!TryCalculatePixelDimension(widthMeters, pixelsPerMeter, out var totalWidthPixels) ||
+            !TryCalculatePixelDimension(heightMeters, pixelsPerMeter, out var totalHeightPixels))
+        {
+            return new TerrainForgerSatelliteDownloadPlan
+            {
+                providerId = settings.imageryProviderId,
+                warningMessage = "Satellite request is too large for a single editor operation. Reduce the area or lower the requested resolution."
+            };
+        }
+
         var maxTileSize = ResolveProviderMaxTileSize(settings.imageryProviderId);
-        var tilesX = Mathf.Max(1, Mathf.CeilToInt(totalWidthPixels / (float)maxTileSize));
-        var tilesY = Mathf.Max(1, Mathf.CeilToInt(totalHeightPixels / (float)maxTileSize));
+        var tilesXLong = Math.Max(1L, DivideAndRoundUp(totalWidthPixels, maxTileSize));
+        var tilesYLong = Math.Max(1L, DivideAndRoundUp(totalHeightPixels, maxTileSize));
+        var totalTilesLong = tilesXLong * tilesYLong;
+        if (totalTilesLong > MaxSatelliteDownloadTiles || tilesXLong > int.MaxValue || tilesYLong > int.MaxValue)
+        {
+            return new TerrainForgerSatelliteDownloadPlan
+            {
+                providerId = settings.imageryProviderId,
+                warningMessage = $"Satellite request is too large for a single editor operation. Reduce the area or resolution so the request stays at or below {MaxSatelliteDownloadTiles} provider tiles."
+            };
+        }
+
+        var tilesX = (int)tilesXLong;
+        var tilesY = (int)tilesYLong;
         var maxTileWidthPixels = Mathf.Max(1, Mathf.CeilToInt(totalWidthPixels / (float)tilesX));
         var maxTileHeightPixels = Mathf.Max(1, Mathf.CeilToInt(totalHeightPixels / (float)tilesY));
-        var totalTiles = tilesX * tilesY;
+        var totalTiles = (int)totalTilesLong;
 
         var warningMessage = string.Empty;
         if (totalTiles > 1)
@@ -694,16 +734,56 @@ public static class TerrainForgerGisDataUtility
                 throw new InvalidOperationException($"Failed to start process '{executable}'.");
             }
 
-            var stdout = process.StandardOutput.ReadToEnd();
-            var stderr = process.StandardError.ReadToEnd();
-            process.WaitForExit();
+            var stdout = new StringBuilder();
+            var stderr = new StringBuilder();
+
+            using (var outputWaitHandle = new AutoResetEvent(false))
+            using (var errorWaitHandle = new AutoResetEvent(false))
+            {
+                process.OutputDataReceived += (sender, args) =>
+                {
+                    if (args.Data == null)
+                    {
+                        outputWaitHandle.Set();
+                    }
+                    else
+                    {
+                        stdout.AppendLine(args.Data);
+                    }
+                };
+
+                process.ErrorDataReceived += (sender, args) =>
+                {
+                    if (args.Data == null)
+                    {
+                        errorWaitHandle.Set();
+                    }
+                    else
+                    {
+                        stderr.AppendLine(args.Data);
+                    }
+                };
+
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                if (!process.WaitForExit(ExternalProcessTimeoutMilliseconds))
+                {
+                    TryKillProcess(process);
+                    throw new TimeoutException(
+                        $"{Path.GetFileName(executable)} timed out after {ExternalProcessTimeoutMilliseconds / 1000} seconds.\nCommand: {executable} {arguments}");
+                }
+
+                outputWaitHandle.WaitOne(5000);
+                errorWaitHandle.WaitOne(5000);
+            }
 
             if (process.ExitCode != 0)
             {
                 throw new InvalidOperationException($"{Path.GetFileName(executable)} failed with exit code {process.ExitCode}.\n{stdout}\n{stderr}");
             }
 
-            return stdout;
+            return stdout.ToString();
         }
     }
 
@@ -782,7 +862,7 @@ public static class TerrainForgerGisDataUtility
 
     private static void DownloadToFile(string url, string absoluteOutputPath)
     {
-        using (var client = new WebClient())
+        using (var client = new TimeoutWebClient(NetworkTimeoutMilliseconds))
         {
             client.Headers.Add(HttpRequestHeader.UserAgent, "TerrainForger/1.0");
             client.DownloadFile(url, absoluteOutputPath);
@@ -793,7 +873,7 @@ public static class TerrainForgerGisDataUtility
 
     private static string UploadJson(string url, string jsonBody)
     {
-        using (var client = new WebClient())
+        using (var client = new TimeoutWebClient(NetworkTimeoutMilliseconds))
         {
             client.Encoding = Encoding.UTF8;
             client.Headers.Add(HttpRequestHeader.UserAgent, "TerrainForger/1.0");
@@ -1039,6 +1119,24 @@ public static class TerrainForgerGisDataUtility
             : 1d / safeValue;
     }
 
+    private static bool TryCalculatePixelDimension(double meters, double pixelsPerMeter, out int pixels)
+    {
+        pixels = 0;
+        var rawPixels = meters * pixelsPerMeter;
+        if (double.IsNaN(rawPixels) || double.IsInfinity(rawPixels) || rawPixels <= 0d || rawPixels > int.MaxValue)
+        {
+            return false;
+        }
+
+        pixels = Math.Max(1, (int)Math.Ceiling(rawPixels));
+        return true;
+    }
+
+    private static long DivideAndRoundUp(long value, long divisor)
+    {
+        return (value + divisor - 1L) / divisor;
+    }
+
     private static string ResolveProviderDisplayName(string providerId)
     {
         var providers = TerrainDataServiceSettings.GetBuiltInProviders();
@@ -1160,5 +1258,44 @@ public static class TerrainForgerGisDataUtility
         var tileCount = Math.Pow(2d, zoomLevel);
         var mercator = Math.PI * (1d - (2d * tileY / tileCount));
         return Mathf.Rad2Deg * (float)Math.Atan(Math.Sinh(mercator));
+    }
+
+    private static void TryKillProcess(Process process)
+    {
+        try
+        {
+            if (process != null && !process.HasExited)
+            {
+                process.Kill();
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private sealed class TimeoutWebClient : WebClient
+    {
+        private readonly int timeoutMilliseconds;
+
+        public TimeoutWebClient(int timeoutMilliseconds)
+        {
+            this.timeoutMilliseconds = timeoutMilliseconds;
+        }
+
+        protected override WebRequest GetWebRequest(Uri address)
+        {
+            var request = base.GetWebRequest(address);
+            if (request != null)
+            {
+                request.Timeout = timeoutMilliseconds;
+                if (request is HttpWebRequest httpRequest)
+                {
+                    httpRequest.ReadWriteTimeout = timeoutMilliseconds;
+                }
+            }
+
+            return request;
+        }
     }
 }
