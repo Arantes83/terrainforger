@@ -18,6 +18,7 @@
 
 - Updated `Get GIS Data`, `Geotiff2Raw Export`, and `Import Tiles` so workflow settings are saved only after real value changes instead of every editor repaint.
 - Stored local source files now go to `Assets/Terrain/Source` instead of `Assets/Terrain/SAT`, keeping the satellite preview focused on downloaded satellite GeoTIFFs.
+- Changed `Geotiff2Raw Export` tile preview names to explicit RGB green `(0, 1, 0)` for better contrast over DEM previews.
 
 ## 2026-04-24
 

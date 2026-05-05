@@ -11,6 +11,8 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
     private const string PngOutputDefault = "Assets/Terrain/PNG";
     private const string DemGeoTiffFolder = "Assets/Terrain/GeoTIFF";
     private const string SatelliteGeoTiffFolder = "Assets/Terrain/SAT";
+    private static readonly Color TilePreviewLabelColor = new Color(0f, 1f, 0f, 1f);
+    private static GUIStyle tilePreviewLabelStyle;
 
     private Vector2 scrollPosition;
     private Texture2D demGridPreviewTexture;
@@ -407,6 +409,25 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
         return selectedIndex == 1 ? TerrainForgerCoastlineDataSource.OpenStreetMap : TerrainForgerCoastlineDataSource.Gshhg;
     }
 
+    private static GUIStyle GetTilePreviewLabelStyle()
+    {
+        if (tilePreviewLabelStyle == null)
+        {
+            tilePreviewLabelStyle = new GUIStyle(EditorStyles.boldLabel)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                clipping = TextClipping.Clip
+            };
+        }
+
+        tilePreviewLabelStyle.normal.textColor = TilePreviewLabelColor;
+        tilePreviewLabelStyle.hover.textColor = TilePreviewLabelColor;
+        tilePreviewLabelStyle.active.textColor = TilePreviewLabelColor;
+        tilePreviewLabelStyle.focused.textColor = TilePreviewLabelColor;
+
+        return tilePreviewLabelStyle;
+    }
+
     private void DrawTileGridOverlay(Rect rect, int rows, int cols)
     {
         Handles.BeginGUI();
@@ -438,10 +459,7 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
                     rect.width / cols,
                     rect.height / rows);
                 var labelRect = new Rect(tileRect.center.x - 24f, tileRect.center.y - 10f, 48f, 20f);
-                var previousContentColor = GUI.contentColor;
-                GUI.contentColor = Color.white;
-                GUI.Label(labelRect, TerrainTileNaming.GetTileLabel(row, col), EditorStyles.whiteBoldLabel);
-                GUI.contentColor = previousContentColor;
+                GUI.Label(labelRect, TerrainTileNaming.GetTileLabel(row, col), GetTilePreviewLabelStyle());
             }
         }
     }
