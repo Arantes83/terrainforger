@@ -7,6 +7,7 @@
 - Updated the Unity package metadata to version `0.1.1`.
 - Documented Git URL, pinned release tag, and minimal GitHub release archive installation paths in `README.md`.
 - Excluded `dist/` release archives and their Unity `.meta` file from source control because they are generated package artifacts.
+- Removed the root `LICENSE.meta` Unity metadata file so GitHub license detection only exposes the real MIT `LICENSE` file.
 
 ### Stability / Reliability
 

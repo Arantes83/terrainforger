@@ -20,6 +20,9 @@ Assets/Generated/
 dist/
 dist.meta
 
+# GitHub license detection should read LICENSE, not Unity metadata for it
+LICENSE.meta
+
 # OS files
 .DS_Store
 Thumbs.db

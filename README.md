@@ -105,7 +105,6 @@ package.json.meta
 Editor.meta
 Editor/
 LICENSE
-LICENSE.meta
 ```
 
 Recommended documentation files for public package archives:
