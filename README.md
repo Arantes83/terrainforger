@@ -87,19 +87,6 @@ https://github.com/Arantes83/terrainforger.git#vX.Y.Z
 
 Replace `vX.Y.Z` with the release tag you want to lock in the Unity project.
 
-### GitHub Release Archive
-
-GitHub release archives for this package should include only the files required by the Unity addon:
-
-```text
-package.json
-package.json.meta
-Editor.meta
-Editor/
-LICENSE
-LICENSE.meta
-```
-
 ### Local Development
 
 Use `Add package from disk...` and point Unity to this repository's `package.json`.
