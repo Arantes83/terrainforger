@@ -238,10 +238,14 @@ public static class TerrainGeoTiffExporter
         TileBounds tileBounds)
     {
         var vectorPath = ResolveCoastlineVectorPath(config, globalBounds);
+        var vectorLayerName = config.coastlineDataSource == TerrainForgerCoastlineDataSource.MapboxWater
+            ? "mapbox_water"
+            : null;
         var tempMaskPath = Path.Combine(tempRoot, $"{tileLabel}_landmask.bin");
         RunGdalRasterize(
             config.qgisInstallFolder,
             vectorPath,
+            vectorLayerName,
             tempMaskPath,
             tileBounds.west,
             tileBounds.south,
@@ -673,6 +677,7 @@ public static class TerrainGeoTiffExporter
     private static void RunGdalRasterize(
         string qgisInstallFolder,
         string inputVectorPath,
+        string layerName,
         string outputPath,
         double west,
         double south,
@@ -703,9 +708,16 @@ public static class TerrainGeoTiffExporter
             "-ts",
             width.ToString(CultureInfo.InvariantCulture),
             height.ToString(CultureInfo.InvariantCulture),
-            Quote(inputVectorPath),
-            Quote(outputPath)
         };
+
+        if (!string.IsNullOrWhiteSpace(layerName))
+        {
+            args.Add("-l");
+            args.Add(layerName);
+        }
+
+        args.Add(Quote(inputVectorPath));
+        args.Add(Quote(outputPath));
 
         RunProcess(executable, string.Join(" ", args), "QGIS gdal_rasterize");
     }
@@ -742,6 +754,8 @@ public static class TerrainGeoTiffExporter
         args.Add($"Y={tileY.ToString(CultureInfo.InvariantCulture)}");
         args.Add("-oo");
         args.Add($"Z={zoom.ToString(CultureInfo.InvariantCulture)}");
+        args.Add("-t_srs");
+        args.Add("EPSG:4326");
         args.Add("-nln");
         args.Add("mapbox_water");
         args.Add("water");
