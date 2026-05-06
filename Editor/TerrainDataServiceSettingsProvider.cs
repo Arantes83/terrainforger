@@ -192,8 +192,8 @@ public static class TerrainDataServiceSettingsProvider
 
         EditorGUI.BeginChangeCheck();
         var accessToken = showSecrets
-            ? EditorGUILayout.TextField(new GUIContent("Access Token", "Mapbox access token used for satellite downloads."), settings.MapboxAccessToken)
-            : EditorGUILayout.PasswordField(new GUIContent("Access Token", "Mapbox access token used for satellite downloads."), settings.MapboxAccessToken);
+            ? EditorGUILayout.TextField(new GUIContent("Access Token", "Mapbox access token used for satellite downloads, Terrain-RGB DEM requests, and Streets v8 water mask downloads."), settings.MapboxAccessToken)
+            : EditorGUILayout.PasswordField(new GUIContent("Access Token", "Mapbox access token used for satellite downloads, Terrain-RGB DEM requests, and Streets v8 water mask downloads."), settings.MapboxAccessToken);
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(settings, "Edit Mapbox Access Token");

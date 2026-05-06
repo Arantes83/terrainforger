@@ -25,6 +25,7 @@ public static class TerrainGeoTiffExporter
     private const string OsmLandPolygonsArchiveUrl = "https://osmdata.openstreetmap.de/download/land-polygons-split-4326.zip";
     private const string OsmLandPolygonsExtractedFolderName = "land-polygons-split-4326";
     private const string OsmLandPolygonsAssetCachePath = "Assets/Terrain/OSMCoastline";
+    private const string MapboxCoastlineAssetCachePath = "Assets/Terrain/MBCoastline";
     private const int ExternalProcessTimeoutMilliseconds = 30 * 60 * 1000;
     private const int NetworkTimeoutMilliseconds = 10 * 60 * 1000;
 
@@ -257,7 +258,14 @@ public static class TerrainGeoTiffExporter
                 $"Unexpected coastline mask size for tile {tileLabel}. Expected {raster.Width}x{raster.Height}, got {landMask.Width}x{landMask.Height}.");
         }
 
-        raster.RemapValuesOutsideLandMask(landMask.Values, config.exportWaterMaskElevation);
+        if (config.coastlineDataSource == TerrainForgerCoastlineDataSource.MapboxWater)
+        {
+            raster.RemapValuesInsideMask(landMask.Values, config.exportWaterMaskElevation);
+        }
+        else
+        {
+            raster.RemapValuesOutsideLandMask(landMask.Values, config.exportWaterMaskElevation);
+        }
     }
 
     private static string ResolveCoastlineVectorPath(TerrainTileImportConfig config, TileBounds globalBounds)
@@ -266,6 +274,8 @@ public static class TerrainGeoTiffExporter
         {
             case TerrainForgerCoastlineDataSource.OpenStreetMap:
                 return ResolveOsmLandVectorPath();
+            case TerrainForgerCoastlineDataSource.MapboxWater:
+                return ResolveMapboxWaterVectorPath(config, globalBounds);
             default:
                 return ResolveGshhgVectorPath(config, globalBounds);
         }
@@ -301,6 +311,76 @@ public static class TerrainGeoTiffExporter
 
         Debug.Log("[TerrainForger Export] Using auto-downloaded OpenStreetMap land polygons for the current region.");
         return shapefilePath;
+    }
+
+    private static string ResolveMapboxWaterVectorPath(TerrainTileImportConfig config, TileBounds globalBounds)
+    {
+        var accessToken = TerrainDataServiceSettings.instance.MapboxAccessToken;
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            throw new InvalidOperationException("Mapbox access token is not configured in Terrain Data Services.");
+        }
+
+        var zoom = Mathf.Clamp(config.mapboxVectorZoom <= 0 ? 13 : config.mapboxVectorZoom, 0, 15);
+        var minX = Mathf.FloorToInt((float)LongitudeToTileX(globalBounds.west, zoom));
+        var maxX = Mathf.FloorToInt((float)(LongitudeToTileX(globalBounds.east, zoom) - 1e-9d));
+        var minY = Mathf.FloorToInt((float)LatitudeToTileY(globalBounds.north, zoom));
+        var maxY = Mathf.FloorToInt((float)(LatitudeToTileY(globalBounds.south, zoom) - 1e-9d));
+        var totalTiles = Mathf.Max(1, (maxX - minX + 1) * (maxY - minY + 1));
+        var cacheRoot = GetMapboxCoastlineCacheRoot();
+        var gpkgPath = Path.Combine(cacheRoot, $"mapbox_water_z{zoom}.gpkg");
+        var hasFeatures = false;
+        var tileIndex = 0;
+
+        Directory.CreateDirectory(cacheRoot);
+        if (File.Exists(gpkgPath))
+        {
+            File.Delete(gpkgPath);
+        }
+
+        for (var tileY = minY; tileY <= maxY; tileY++)
+        {
+            for (var tileX = minX; tileX <= maxX; tileX++)
+            {
+                tileIndex++;
+                EditorUtility.DisplayProgressBar(
+                    "TerrainForger Mapbox Coastline",
+                    $"Downloading Mapbox water tile {tileIndex} of {totalTiles}...",
+                    tileIndex / (float)Math.Max(1, totalTiles));
+
+                var tileFolder = Path.Combine(cacheRoot, zoom.ToString(CultureInfo.InvariantCulture), tileX.ToString(CultureInfo.InvariantCulture));
+                Directory.CreateDirectory(tileFolder);
+                var tilePath = Path.Combine(tileFolder, $"{tileY}.mvt");
+                var url =
+                    $"https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/{zoom}/{tileX}/{tileY}.mvt" +
+                    $"?access_token={Uri.EscapeDataString(accessToken)}";
+
+                DownloadFileWithUserAgent(url, tilePath);
+
+                try
+                {
+                    AppendMapboxWaterTileToGeoPackage(config.qgisInstallFolder, tilePath, gpkgPath, zoom, tileX, tileY, append: hasFeatures);
+                    hasFeatures = true;
+                }
+                catch (InvalidOperationException ex) when (
+                    ex.Message.IndexOf("Unable to find layer", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    ex.Message.IndexOf("Couldn't fetch requested layer", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    ex.Message.IndexOf("FAILURE:", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    Debug.LogWarning($"[TerrainForger Export] Skipping Mapbox water tile {zoom}/{tileX}/{tileY}: {ex.Message}");
+                }
+            }
+        }
+
+        EditorUtility.ClearProgressBar();
+
+        if (!hasFeatures || !File.Exists(gpkgPath))
+        {
+            throw new InvalidOperationException("Mapbox water download did not produce a usable coastline dataset for the selected bounds.");
+        }
+
+        Debug.Log($"[TerrainForger Export] Using Mapbox Streets v8 water polygons from {gpkgPath}.");
+        return gpkgPath;
     }
 
     private static char SelectGshhgResolution(TerrainForgerGshhgResolutionMode resolutionMode, TileBounds bounds)
@@ -459,6 +539,11 @@ public static class TerrainGeoTiffExporter
     private static string GetOsmLandCacheRoot()
     {
         return ResolvePath(OsmLandPolygonsAssetCachePath);
+    }
+
+    private static string GetMapboxCoastlineCacheRoot()
+    {
+        return ResolvePath(MapboxCoastlineAssetCachePath);
     }
 
     private static string FindGshhgDatasetRoot(string cacheRoot)
@@ -625,6 +710,45 @@ public static class TerrainGeoTiffExporter
         RunProcess(executable, string.Join(" ", args), "QGIS gdal_rasterize");
     }
 
+    private static void AppendMapboxWaterTileToGeoPackage(
+        string qgisInstallFolder,
+        string inputTilePath,
+        string outputGeoPackagePath,
+        int zoom,
+        int tileX,
+        int tileY,
+        bool append)
+    {
+        var executable = ResolveQgisExecutable(qgisInstallFolder, "ogr2ogr.exe");
+        var inputDataset = $"MVT:{inputTilePath}";
+        var args = new List<string>();
+
+        if (!append)
+        {
+            args.Add("-f");
+            args.Add("GPKG");
+        }
+        else
+        {
+            args.Add("-update");
+            args.Add("-append");
+        }
+
+        args.Add(Quote(outputGeoPackagePath));
+        args.Add(Quote(inputDataset));
+        args.Add("-oo");
+        args.Add($"X={tileX.ToString(CultureInfo.InvariantCulture)}");
+        args.Add("-oo");
+        args.Add($"Y={tileY.ToString(CultureInfo.InvariantCulture)}");
+        args.Add("-oo");
+        args.Add($"Z={zoom.ToString(CultureInfo.InvariantCulture)}");
+        args.Add("-nln");
+        args.Add("mapbox_water");
+        args.Add("water");
+
+        RunProcess(executable, string.Join(" ", args), "QGIS ogr2ogr");
+    }
+
     private static TerrainTileElevationMetadata WriteRaw16Tile(TerrainTileImportConfig config, EnviFloatRaster raster, string outputRawPath)
     {
         var processedMin = float.PositiveInfinity;
@@ -689,7 +813,15 @@ public static class TerrainGeoTiffExporter
 
     private static string GetCoastlineSourceLabel(TerrainForgerCoastlineDataSource source)
     {
-        return source == TerrainForgerCoastlineDataSource.OpenStreetMap ? "OpenStreetMap" : "GSHHG";
+        switch (source)
+        {
+            case TerrainForgerCoastlineDataSource.OpenStreetMap:
+                return "OpenStreetMap";
+            case TerrainForgerCoastlineDataSource.MapboxWater:
+                return "Mapbox Water";
+            default:
+                return "GSHHG";
+        }
     }
 
     private static void ApplyTileSpatialMetadata(
@@ -747,6 +879,11 @@ public static class TerrainGeoTiffExporter
             if (config.coastlineDataSource == TerrainForgerCoastlineDataSource.OpenStreetMap)
             {
                 builder.AppendLine($"OSM Land Dataset Cache: {ResolvePath(OsmLandPolygonsAssetCachePath)}");
+            }
+            else if (config.coastlineDataSource == TerrainForgerCoastlineDataSource.MapboxWater)
+            {
+                builder.AppendLine($"Mapbox Vector Zoom: {config.mapboxVectorZoom}");
+                builder.AppendLine($"Mapbox Coastline Cache: {ResolvePath(MapboxCoastlineAssetCachePath)}");
             }
             else
             {
@@ -1100,6 +1237,20 @@ public static class TerrainGeoTiffExporter
         return degrees * (Math.PI / 180d);
     }
 
+    private static double LongitudeToTileX(double longitude, int zoomLevel)
+    {
+        var tileCount = Math.Pow(2d, zoomLevel);
+        return ((longitude + 180d) / 360d) * tileCount;
+    }
+
+    private static double LatitudeToTileY(double latitude, int zoomLevel)
+    {
+        var clampedLatitude = Mathf.Clamp((float)latitude, -85.05112878f, 85.05112878f) * Mathf.Deg2Rad;
+        var tileCount = Math.Pow(2d, zoomLevel);
+        var mercator = Math.Log(Math.Tan(clampedLatitude) + (1d / Math.Cos(clampedLatitude)));
+        return (1d - (mercator / Math.PI)) * 0.5d * tileCount;
+    }
+
     private static TileBounds ParseWgs84Bounds(string gdalInfoJson)
     {
         var wgsSectionIndex = gdalInfoJson.IndexOf("\"wgs84Extent\"", StringComparison.OrdinalIgnoreCase);
@@ -1299,6 +1450,23 @@ public static class TerrainGeoTiffExporter
             {
                 var value = Values[i];
                 if (landMaskValues[i] == 0 || float.IsNaN(value) || float.IsInfinity(value))
+                {
+                    Values[i] = waterElevation;
+                }
+            }
+        }
+
+        public void RemapValuesInsideMask(byte[] maskValues, float waterElevation)
+        {
+            if (maskValues == null || maskValues.Length != Values.Length)
+            {
+                throw new InvalidOperationException("The Mapbox water mask size does not match the DEM raster size.");
+            }
+
+            for (var i = 0; i < Values.Length; i++)
+            {
+                var value = Values[i];
+                if (maskValues[i] != 0 || float.IsNaN(value) || float.IsInfinity(value))
                 {
                     Values[i] = waterElevation;
                 }

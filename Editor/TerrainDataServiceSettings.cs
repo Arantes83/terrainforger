@@ -113,9 +113,9 @@ public class TerrainDataServiceSettings : ScriptableSingleton<TerrainDataService
                 displayName = "Mapbox",
                 docsUrl = "https://console.mapbox.com/account/access-tokens/",
                 accessModel = "Commercial access token",
-                supportsElevation = false,
+                supportsElevation = true,
                 supportsImagery = true,
-                notes = "Satellite and map APIs use a Mapbox access token. Check Mapbox terms before bulk download or offline bake workflows."
+                notes = "Satellite, Terrain-RGB DEM, and vector map APIs use a Mapbox access token. Check Mapbox terms before bulk download or offline bake workflows."
             },
             new TerrainBuiltInProviderInfo
             {

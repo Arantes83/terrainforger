@@ -17,8 +17,12 @@ public static class TerrainForgerGisDataUtility
     private const string SourceAssetPath = "Assets/Terrain/Source";
     private const string GeoTiffAssetPath = "Assets/Terrain/GeoTIFF";
     private const string SatAssetPath = "Assets/Terrain/SAT";
+    public const string MapboxCoastlineAssetPath = "Assets/Terrain/MBCoastline";
     private const int DefaultDemPreviewSize = 512;
+    private const int DefaultMapboxDemZoom = 13;
+    private const int DefaultMapboxVectorZoom = 13;
     private const int MapboxMaxStaticImageSize = 1280;
+    private const int MapboxTerrainRgbTileSize = 512;
     private const int GoogleMapsDefaultTileSize = 256;
     private const int GoogleMapsMaxZoomLevel = 22;
     private const int MaxSatelliteDownloadTiles = 256;
@@ -119,6 +123,9 @@ public static class TerrainForgerGisDataUtility
         {
             case TerrainDataProviderIds.OpenTopography:
                 DownloadOpenTopographyDem(settings);
+                return;
+            case TerrainDataProviderIds.Mapbox:
+                DownloadMapboxDem(settings);
                 return;
             default:
                 throw new InvalidOperationException($"Unsupported DEM provider id: {settings.demProviderId}");
@@ -370,6 +377,95 @@ public static class TerrainForgerGisDataUtility
         finally
         {
             EditorUtility.ClearProgressBar();
+        }
+    }
+
+    private static void DownloadMapboxDem(TerrainForgeWorkflowSettings settings)
+    {
+        var accessToken = TerrainDataServiceSettings.instance.MapboxAccessToken;
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            throw new InvalidOperationException("Mapbox access token is not configured in Terrain Data Services.");
+        }
+
+        var zoom = Mathf.Clamp(settings.mapboxDemZoom <= 0 ? DefaultMapboxDemZoom : settings.mapboxDemZoom, 0, 15);
+        var west = settings.westBound.ToDecimalDegrees();
+        var south = settings.southBound.ToDecimalDegrees();
+        var east = settings.eastBound.ToDecimalDegrees();
+        var north = settings.northBound.ToDecimalDegrees();
+        var minX = Mathf.FloorToInt((float)LongitudeToTileX(west, zoom));
+        var maxX = Mathf.FloorToInt((float)(LongitudeToTileX(east, zoom) - 1e-9d));
+        var minY = Mathf.FloorToInt((float)LatitudeToTileY(north, zoom));
+        var maxY = Mathf.FloorToInt((float)(LatitudeToTileY(south, zoom) - 1e-9d));
+        var totalTiles = Mathf.Max(1, (maxX - minX + 1) * (maxY - minY + 1));
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"terrainforger_mapbox_dem_{Guid.NewGuid():N}");
+        var outputFileName = $"dem_mapbox_terrainrgb_z{zoom}_{DateTime.Now:yyyyMMdd_HHmmss}.tif";
+        var outputAssetPath = CombineAssetPath(GeoTiffAssetPath, outputFileName);
+        var outputFullPath = ToAbsoluteProjectPath(outputAssetPath);
+        var tileGeoTiffs = new string[totalTiles];
+        var tileIndex = 0;
+
+        try
+        {
+            Directory.CreateDirectory(tempRoot);
+
+            for (var tileY = minY; tileY <= maxY; tileY++)
+            {
+                for (var tileX = minX; tileX <= maxX; tileX++)
+                {
+                    EditorUtility.DisplayProgressBar(
+                        DemDownloadProgressTitle,
+                        $"Downloading Mapbox DEM tile {tileIndex + 1} of {totalTiles}...",
+                        Mathf.Lerp(0.05f, 0.7f, tileIndex / (float)Math.Max(1, totalTiles)));
+
+                    var url =
+                        $"https://api.mapbox.com/v4/mapbox.terrain-rgb/{zoom}/{tileX}/{tileY}@2x.pngraw" +
+                        $"?access_token={Uri.EscapeDataString(accessToken)}";
+                    var pngPath = Path.Combine(tempRoot, $"terrainrgb_{zoom}_{tileX}_{tileY}.pngraw");
+                    var binPath = Path.Combine(tempRoot, $"terrainrgb_{zoom}_{tileX}_{tileY}.bin");
+                    var mercatorTiffPath = Path.Combine(tempRoot, $"terrainrgb_{zoom}_{tileX}_{tileY}.tif");
+                    try
+                    {
+                        DownloadToFile(url, pngPath);
+                        WriteMapboxTerrainRgbEnviFloat(pngPath, binPath, MapboxTerrainRgbTileSize);
+                    }
+                    catch (WebException ex) when (IsMapboxMissingTerrainTile(ex))
+                    {
+                        WriteFlatEnviFloat(binPath, MapboxTerrainRgbTileSize, 0f);
+                    }
+
+                    var tileWest = TileXToLongitude(tileX, zoom);
+                    var tileEast = TileXToLongitude(tileX + 1d, zoom);
+                    var tileNorth = TileYToLatitude(tileY, zoom);
+                    var tileSouth = TileYToLatitude(tileY + 1d, zoom);
+                    GeoreferenceEnviFloatToMercator(
+                        binPath,
+                        mercatorTiffPath,
+                        LongitudeToWebMercatorX(tileWest),
+                        LatitudeToWebMercatorY(tileSouth),
+                        LongitudeToWebMercatorX(tileEast),
+                        LatitudeToWebMercatorY(tileNorth));
+
+                    tileGeoTiffs[tileIndex++] = mercatorTiffPath;
+                }
+            }
+
+            EditorUtility.DisplayProgressBar(DemDownloadProgressTitle, "Building final Mapbox DEM GeoTIFF...", 0.9f);
+            BuildGeoTiffMosaic(tempRoot, "mapbox_dem.vrt", tileGeoTiffs, outputFullPath, west, south, east, north, "Float32");
+
+            settings.geoTiffPath = outputAssetPath;
+            settings.lastDemGeoTiffPath = outputAssetPath;
+            AssetDatabase.Refresh();
+            settings.SaveSettings();
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, true);
+            }
         }
     }
 
@@ -682,6 +778,132 @@ public static class TerrainForgerGisDataUtility
         return executablePath;
     }
 
+    private static void WriteMapboxTerrainRgbEnviFloat(string pngPath, string binPath, int expectedSize)
+    {
+        var bytes = File.ReadAllBytes(pngPath);
+        var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false, true);
+
+        try
+        {
+            if (!texture.LoadImage(bytes, markNonReadable: false))
+            {
+                throw new InvalidOperationException("Failed to decode Mapbox Terrain-RGB tile.");
+            }
+
+            if (texture.width != expectedSize || texture.height != expectedSize)
+            {
+                throw new InvalidOperationException($"Unexpected Mapbox Terrain-RGB tile size. Expected {expectedSize}x{expectedSize}, got {texture.width}x{texture.height}.");
+            }
+
+            using (var writer = new BinaryWriter(File.Open(binPath, FileMode.Create, FileAccess.Write)))
+            {
+                for (var y = texture.height - 1; y >= 0; y--)
+                {
+                    for (var x = 0; x < texture.width; x++)
+                    {
+                        var color = texture.GetPixel(x, y);
+                        var r = Mathf.RoundToInt(color.r * 255f);
+                        var g = Mathf.RoundToInt(color.g * 255f);
+                        var b = Mathf.RoundToInt(color.b * 255f);
+                        var elevation = -10000f + ((r * 256f * 256f + g * 256f + b) * 0.1f);
+                        writer.Write(elevation);
+                    }
+                }
+            }
+
+            var hdrPath = Path.ChangeExtension(binPath, ".hdr");
+            File.WriteAllText(hdrPath, string.Join("\n", new[]
+            {
+                "ENVI",
+                "samples = " + texture.width.ToString(CultureInfo.InvariantCulture),
+                "lines   = " + texture.height.ToString(CultureInfo.InvariantCulture),
+                "bands   = 1",
+                "header offset = 0",
+                "file type = ENVI Standard",
+                "data type = 4",
+                "interleave = bsq",
+                "byte order = 0"
+            }));
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(texture);
+        }
+    }
+
+    private static void WriteFlatEnviFloat(string binPath, int size, float elevation)
+    {
+        using (var writer = new BinaryWriter(File.Open(binPath, FileMode.Create, FileAccess.Write)))
+        {
+            for (var i = 0; i < size * size; i++)
+            {
+                writer.Write(elevation);
+            }
+        }
+
+        var hdrPath = Path.ChangeExtension(binPath, ".hdr");
+        File.WriteAllText(hdrPath, string.Join("\n", new[]
+        {
+            "ENVI",
+            "samples = " + size.ToString(CultureInfo.InvariantCulture),
+            "lines   = " + size.ToString(CultureInfo.InvariantCulture),
+            "bands   = 1",
+            "header offset = 0",
+            "file type = ENVI Standard",
+            "data type = 4",
+            "interleave = bsq",
+            "byte order = 0"
+        }));
+    }
+
+    private static bool IsMapboxMissingTerrainTile(WebException exception)
+    {
+        if (exception == null)
+        {
+            return false;
+        }
+
+        using (var response = exception.Response as HttpWebResponse)
+        {
+            if (response == null)
+            {
+                return false;
+            }
+
+            if (response.StatusCode != HttpStatusCode.NotFound)
+            {
+                return false;
+            }
+
+            using (var stream = response.GetResponseStream())
+            using (var reader = stream == null ? null : new StreamReader(stream))
+            {
+                var body = reader?.ReadToEnd() ?? string.Empty;
+                return body.IndexOf("Tile does not exist", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+        }
+    }
+
+    private static void GeoreferenceEnviFloatToMercator(string inputBinaryPath, string outputGeoTiffPath, double west, double south, double east, double north)
+    {
+        var gdalTranslatePath = ResolveQgisExecutable("gdal_translate.exe");
+        var arguments = string.Join(" ", new[]
+        {
+            "-of GTiff",
+            "-ot Float32",
+            "-a_srs EPSG:3857",
+            "-a_ullr",
+            FormatDouble(west),
+            FormatDouble(north),
+            FormatDouble(east),
+            FormatDouble(south),
+            Quote(inputBinaryPath),
+            Quote(outputGeoTiffPath)
+        });
+
+        RunProcess(gdalTranslatePath, arguments);
+    }
+
     private static void GeoreferenceAndWarpWebMercatorImage(
         string inputImagePath,
         string tempMercatorPath,
@@ -906,6 +1128,7 @@ public static class TerrainForgerGisDataUtility
         Directory.CreateDirectory(ToAbsoluteProjectPath(SourceAssetPath));
         Directory.CreateDirectory(ToAbsoluteProjectPath(GeoTiffAssetPath));
         Directory.CreateDirectory(ToAbsoluteProjectPath(SatAssetPath));
+        Directory.CreateDirectory(ToAbsoluteProjectPath(MapboxCoastlineAssetPath));
         AssetDatabase.Refresh();
     }
 
@@ -1127,7 +1350,8 @@ public static class TerrainForgerGisDataUtility
         double west,
         double south,
         double east,
-        double north)
+        double north,
+        string outputType = null)
     {
         var vrtPath = Path.Combine(tempRoot, vrtFileName);
         var buildVrtPath = ResolveQgisExecutable("gdalbuildvrt.exe");
@@ -1148,10 +1372,12 @@ public static class TerrainForgerGisDataUtility
             FormatDouble(south),
             FormatDouble(east),
             FormatDouble(north),
+            string.IsNullOrWhiteSpace(outputType) ? string.Empty : "-ot",
+            string.IsNullOrWhiteSpace(outputType) ? string.Empty : outputType,
             "-of GTiff",
             Quote(vrtPath),
             Quote(outputGeoTiffPath)
-        });
+        }.Where(value => !string.IsNullOrWhiteSpace(value)).ToArray());
         RunProcess(gdalWarpPath, warpArgs);
     }
 

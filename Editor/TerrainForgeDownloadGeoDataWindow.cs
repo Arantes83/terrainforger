@@ -92,7 +92,8 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
                     var demProviders = TerrainForgeWindowUtility.GetConfiguredProviders(
                         supportsElevation: true,
                         supportsImagery: false,
-                        TerrainDataProviderIds.OpenTopography);
+                        TerrainDataProviderIds.OpenTopography,
+                        TerrainDataProviderIds.Mapbox);
                     if (demProviders.Length == 0)
                     {
                         EditorGUILayout.HelpBox("No DEM providers are configured. Add credentials in Service Settings.", MessageType.Warning);
@@ -102,6 +103,16 @@ public class TerrainForgeDownloadGeoDataWindow : EditorWindow
                     {
                         var selectedDemIndex = TerrainForgeWindowUtility.DrawConfiguredProviderPopup("DEM Provider", demProviders, settings.demProviderId);
                         settings.demProviderId = demProviders[selectedDemIndex].providerId;
+                    }
+
+                    if (settings.demProviderId == TerrainDataProviderIds.Mapbox)
+                    {
+                        settings.mapboxDemZoom = EditorGUILayout.IntSlider(
+                            new GUIContent("Mapbox DEM Zoom", "Zoom level used for Mapbox Terrain-RGB DEM downloads. Default is 13, and the download uses 512 px @2x tiles."),
+                            Mathf.Clamp(settings.mapboxDemZoom <= 0 ? 13 : settings.mapboxDemZoom, 0, 15),
+                            0,
+                            15);
+                        EditorGUILayout.LabelField(new GUIContent("Mapbox DEM Tile Size", "Mapbox DEM downloads use 512 px Terrain-RGB tiles via the @2x endpoint."), "512 px (@2x)");
                     }
 
                     var imageryProviders = TerrainForgeWindowUtility.GetConfiguredProviders(

@@ -105,11 +105,22 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
                             settings.gshhgResolutionMode = (TerrainForgerGshhgResolutionMode)EditorGUILayout.EnumPopup(new GUIContent("GSHHG Resolution", "Resolution level TerrainForger should use when selecting the GSHHG shoreline dataset."), settings.gshhgResolutionMode);
                         }
 
+                        if (settings.coastlineDataSource == TerrainForgerCoastlineDataSource.MapboxWater)
+                        {
+                            settings.mapboxVectorZoom = EditorGUILayout.IntSlider(
+                                new GUIContent("Mapbox Vector Zoom", "Zoom level used to download Mapbox Streets v8 water polygons for the coastline mask. Default is 13."),
+                                Mathf.Clamp(settings.mapboxVectorZoom <= 0 ? 13 : settings.mapboxVectorZoom, 0, 15),
+                                0,
+                                15);
+                        }
+
                         settings.exportWaterMaskElevation = EditorGUILayout.FloatField(new GUIContent("Water Elevation", "Elevation assigned to DEM samples outside the selected coastline land mask."), settings.exportWaterMaskElevation);
                     }
                     var coastlineHelp = settings.coastlineDataSource == TerrainForgerCoastlineDataSource.Gshhg
                         ? "Use GSHHG land polygons to define the shoreline. TerrainForger auto-downloads the official dataset and, in Auto mode, picks the best resolution for the current region. Samples outside the land mask are exported at the configured water elevation, which avoids clipping the coastline from DEM altitude alone."
-                        : "Use OpenStreetMap-derived land polygons to define the shoreline. TerrainForger auto-downloads the processed OSM land polygons in WGS84. This option can better match edited or recent coastlines, while still masking the DEM by land polygons instead of clipping by elevation.";
+                        : settings.coastlineDataSource == TerrainForgerCoastlineDataSource.MapboxWater
+                            ? "Use Mapbox Streets v8 water polygons to define the coastline mask. TerrainForger downloads water features into Assets/Terrain/MBCoastline and burns the configured water elevation inside the downloaded water mask."
+                            : "Use OpenStreetMap-derived land polygons to define the shoreline. TerrainForger auto-downloads the processed OSM land polygons in WGS84. This option can better match edited or recent coastlines, while still masking the DEM by land polygons instead of clipping by elevation.";
                     EditorGUILayout.HelpBox(coastlineHelp, MessageType.None);
                 }
 
@@ -403,10 +414,22 @@ public class TerrainForgeGeotiff2RawExportWindow : EditorWindow
 
     private static TerrainForgerCoastlineDataSource DrawCoastlineSourcePopup(string label, TerrainForgerCoastlineDataSource currentValue)
     {
-        var options = new[] { "GSHHG", "OpenStreetMap" };
-        var selectedIndex = currentValue == TerrainForgerCoastlineDataSource.OpenStreetMap ? 1 : 0;
+        var options = new[] { "GSHHG", "OpenStreetMap", "Mapbox Water" };
+        var selectedIndex = currentValue == TerrainForgerCoastlineDataSource.OpenStreetMap
+            ? 1
+            : currentValue == TerrainForgerCoastlineDataSource.MapboxWater
+                ? 2
+                : 0;
         selectedIndex = EditorGUILayout.Popup(new GUIContent(label, "Choose which shoreline dataset TerrainForger should use when masking exported DEM tiles."), selectedIndex, options);
-        return selectedIndex == 1 ? TerrainForgerCoastlineDataSource.OpenStreetMap : TerrainForgerCoastlineDataSource.Gshhg;
+        switch (selectedIndex)
+        {
+            case 1:
+                return TerrainForgerCoastlineDataSource.OpenStreetMap;
+            case 2:
+                return TerrainForgerCoastlineDataSource.MapboxWater;
+            default:
+                return TerrainForgerCoastlineDataSource.Gshhg;
+        }
     }
 
     private static GUIStyle GetTilePreviewLabelStyle()

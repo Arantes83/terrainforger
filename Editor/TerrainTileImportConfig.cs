@@ -64,6 +64,10 @@ public class TerrainTileImportConfig : ScriptableObject
     public float exportWaterMaskElevation = -10f;
     [Tooltip("Writes a text manifest with the export settings next to the RAW tiles.")]
     public bool writeExportManifest = true;
+    [Tooltip("Mapbox Terrain-RGB zoom level used for DEM downloads.")]
+    public int mapboxDemZoom = 13;
+    [Tooltip("Mapbox Streets vector tile zoom level used for coastline mask downloads.")]
+    public int mapboxVectorZoom = 13;
 
     [Header("GeoTIFF Bounds")]
     public LatitudeDdm northBound = LatitudeDdm.Create(LatitudeHemisphere.South, 12, 30, 0);

@@ -13,6 +13,8 @@ public class TerrainForgeWorkflowSettings : ScriptableSingleton<TerrainForgeWork
     public float satelliteResolution = 1f;
     public string lastDemGeoTiffPath = string.Empty;
     public string lastSatelliteImagePath = string.Empty;
+    public int mapboxDemZoom = 13;
+    public int mapboxVectorZoom = 13;
 
     [Header("Grid")]
     public int rows = 6;
@@ -116,6 +118,8 @@ public class TerrainForgeWorkflowSettings : ScriptableSingleton<TerrainForgeWork
         gshhgResolutionMode = config.gshhgResolutionMode;
         exportWaterMaskElevation = config.exportWaterMaskElevation;
         writeExportManifest = config.writeExportManifest;
+        mapboxDemZoom = config.mapboxDemZoom;
+        mapboxVectorZoom = config.mapboxVectorZoom;
         northBound = config.northBound;
         southBound = config.southBound;
         westBound = config.westBound;
@@ -165,6 +169,8 @@ public class TerrainForgeWorkflowSettings : ScriptableSingleton<TerrainForgeWork
         config.gshhgResolutionMode = gshhgResolutionMode;
         config.exportWaterMaskElevation = exportWaterMaskElevation;
         config.writeExportManifest = writeExportManifest;
+        config.mapboxDemZoom = mapboxDemZoom;
+        config.mapboxVectorZoom = mapboxVectorZoom;
         config.northBound = northBound;
         config.southBound = southBound;
         config.westBound = westBound;

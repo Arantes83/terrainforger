@@ -24,7 +24,8 @@ public enum TerrainForgerGshhgResolutionMode
 public enum TerrainForgerCoastlineDataSource
 {
     Gshhg,
-    OpenStreetMap
+    OpenStreetMap,
+    MapboxWater
 }
 
 public struct TerrainForgerSatelliteDownloadPlan
