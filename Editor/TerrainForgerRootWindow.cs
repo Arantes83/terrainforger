@@ -78,6 +78,10 @@ public class TerrainForgerRootWindow : EditorWindow
             {
                 TerrainForgeGeotiff2RawExportWindow.Open();
             }
+            if (GUILayout.Button(new GUIContent("Import Vector Data", "Download or convert vector data first, then place buildings and roads as separate terrain-aligned steps.")))
+            {
+                VectorImportWindow.Open();
+            }
             if (GUILayout.Button(new GUIContent("Import Tiles", "Import RAW terrain tiles and exact-resolution PNG satellite layers into Unity Terrain.")))
             {
                 TerrainForgeImportTilesWindow.Open();

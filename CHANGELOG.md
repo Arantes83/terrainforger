@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Vector Import
+
+- Added the new `Import Vector Data` editor workflow for staged vector acquisition and placement.
+- Added OpenStreetMap Overpass and local GDAL/OGR vector providers for building and road imports.
+- Added normalized vector intermediates and per-layer placement reports under the generated TerrainForger output path.
+- Added terrain-aligned urban generation for building meshes and road meshes with separate `Place Buildings` and `Place Roads` actions.
+
+### UI / UX
+
+- Added `Import Vector Data` to the main TerrainForger tool menu.
+- Moved `Import Vector Data` above `Import Tiles` because vector acquisition and placement should happen earlier in the workflow.
+
 ## 0.1.1 - 2026-05-05
 
 ### Release / Packaging
